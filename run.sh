@@ -27,5 +27,13 @@ $PY_CMD -c "import streamlit, pandas, numpy, scipy, plotly, reportlab, openpyxl,
     $PY_CMD -m pip install -r requirements.txt
 }
 
+echo "Verifica rete locale..."
+LOCAL_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "localhost")
+
+echo "============================================================"
+echo " 💻 Accesso da questo Mac:      http://localhost:8501"
+echo " 📱 Accesso da Mobile (Wi-Fi):   http://${LOCAL_IP}:8501"
+echo "============================================================"
+echo ""
 echo "Avvio interfaccia grafica Streamlit..."
-$PY_CMD -m streamlit run app.py --server.port 8501 --server.headless false
+$PY_CMD -m streamlit run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless false
