@@ -56,11 +56,11 @@ accounts = db.get_accounts()
 # ================= SIDEBAR =================
 with st.sidebar:
     st.markdown("## 🏛️ **LUCAINVESTRATTO**")
-    st.caption("v1.0.0 • Institutional Financial Suite")
-    st.divider()
+    st.caption("Institutional Financial Suite • Multi-Account")
+    st.markdown("<hr style='margin: 8px 0 14px 0; border: none; border-top: 1px solid rgba(255, 255, 255, 0.1);'>", unsafe_allow_html=True)
 
-    # Account Scope Selector
-    st.markdown("### 🏦 **Perimetro Conto**")
+    # 1. Perimetro Conto & Scope Selector
+    st.markdown("##### 🏦 **Perimetro Conto**")
     account_options = {"all": "🌐 Tutti i conti (Consolidato)"}
     for acc in accounts:
         account_options[acc.id] = f"{acc.name} ({acc.bank_name or acc.currency})"
@@ -69,7 +69,8 @@ with st.sidebar:
         "Seleziona Conto di Analisi:",
         options=list(account_options.keys()),
         format_func=lambda k: account_options[k],
-        index=0
+        index=0,
+        label_visibility="collapsed"
     )
     selected_account_name = account_options[selected_account_id]
 
@@ -83,36 +84,89 @@ with st.sidebar:
     tot_invest = asset_sum["total_market_value"]
     net_worth = tot_cash + tot_invest
 
-    st.markdown("---")
-    st.markdown(f"**Liquidità Disponibile:**<br>`€ {tot_cash:,.2f}`", unsafe_allow_html=True)
-    st.markdown(f"**Portafoglio Investito:**<br>`€ {tot_invest:,.2f}`", unsafe_allow_html=True)
-    st.markdown(f"**Patrimonio Netto:**<br><span style='color: {active_colors['primary_color']}; font-size: 1.15em; font-weight: bold;'>€ {net_worth:,.2f}</span>", unsafe_allow_html=True)
-    st.markdown("---")
+    # Sleek Compact Wealth Card
+    st.markdown(f"""
+    <div class="sidebar-wealth-card">
+        <div class="sidebar-wealth-row">
+            <span>Liquidità:</span>
+            <b>€ {tot_cash:,.2f}</b>
+        </div>
+        <div class="sidebar-wealth-row">
+            <span>Portafoglio:</span>
+            <b>€ {tot_invest:,.2f}</b>
+        </div>
+        <div class="sidebar-wealth-total">
+            <span>Patrimonio Netto:</span>
+            <b>€ {net_worth:,.2f}</b>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     # Evaluate Active Notifications
     active_alerts = evaluate_alerts(app_settings, accounts, active_holdings, active_txs)
     if active_alerts:
-        st.warning(f"⚠️ **{len(active_alerts)} Alert Rilevati**")
+        st.markdown(f"""
+        <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 8px; padding: 6px 10px; margin-bottom: 12px; font-size: 11.5px; color: #FCA5A5; display: flex; align-items: center; gap: 6px;">
+            <span>⚠️</span> <b>{len(active_alerts)} soglie di alert superate</b>
+        </div>
+        """, unsafe_allow_html=True)
 
-    # Main Navigation
-    st.markdown("### 🧭 **Menu Navigazione**")
-    nav_choice = st.radio(
-        "Seleziona Maschera:",
-        [
-            "📊 Dashboard Consolidata",
-            "📅 Estratto Conto per Data",
-            "💼 Analisi per Asset",
-            "📈 Analisi Investimento (FactSet)",
-            "📸 Snapshot & Quadratura Mensile",
-            "📥 Import Dati (.xlsx, .csv, .txt, .img)",
-            "🏦 Gestione Conti Bancari",
-            "📑 Esportazione Report (.pdf, .xlsx, .txt)",
-            "⚙️ Impostazioni & Alert"
-        ],
-        index=0
-    )
+    # 2. Main Navigation Reorganized by Logical Sections
+    st.markdown("### 🧭 **Navigazione**")
 
-    st.divider()
+    if "nav_choice" not in st.session_state:
+        st.session_state["nav_choice"] = "📊 Dashboard Consolidata"
+
+    # Coherent Categorized Navigation Sections
+    NAV_SECTIONS = [
+        {
+            "title": "🏛️ SINTESI & PANORAMICA",
+            "items": [
+                ("📊 Dashboard Consolidata", "dash")
+            ]
+        },
+        {
+            "title": "🔬 ANALISI & PORTAFOGLIO",
+            "items": [
+                ("💼 Analisi per Asset", "assets"),
+                ("📈 Analisi Investimento (FactSet)", "factset"),
+                ("📅 Estratto Conto per Data", "cashflow")
+            ]
+        },
+        {
+            "title": "⚖️ CONTABILITÀ & CHIUSURA",
+            "items": [
+                ("📸 Snapshot & Quadratura Mensile", "snapshots")
+            ]
+        },
+        {
+            "title": "📂 GESTIONE DATI & REPORT",
+            "items": [
+                ("📥 Import Dati (.xlsx, .csv, .txt, .img)", "import"),
+                ("🏦 Gestione Conti Bancari", "accounts"),
+                ("📑 Esportazione Report (.pdf, .xlsx, .txt)", "export")
+            ]
+        },
+        {
+            "title": "⚙️ CONFIGURAZIONE",
+            "items": [
+                ("⚙️ Impostazioni & Alert", "settings")
+            ]
+        }
+    ]
+
+    for sec in NAV_SECTIONS:
+        st.markdown(f'<div class="sidebar-section-title">{sec["title"]}</div>', unsafe_allow_html=True)
+        for label, btn_key in sec["items"]:
+            is_active = (st.session_state["nav_choice"] == label)
+            btn_type = "primary" if is_active else "secondary"
+            if st.button(label, key=f"nav_btn_{btn_key}", type=btn_type, use_container_width=True):
+                st.session_state["nav_choice"] = label
+                st.rerun()
+
+    nav_choice = st.session_state["nav_choice"]
+
+    st.markdown("<hr style='margin: 16px 0 8px 0; border: none; border-top: 1px solid rgba(255, 255, 255, 0.1);'>", unsafe_allow_html=True)
     st.caption("© 2026 LUCAINVESTRATTO Financial Analytics")
 
 

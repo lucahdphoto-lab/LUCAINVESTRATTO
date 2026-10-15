@@ -248,6 +248,80 @@ def apply_theme(settings: Optional[AppSettings] = None):
             border: 1px solid #BFDBFE;
             color: #1E40AF;
         }}
+
+        /* Sidebar Navigation & Section Categorization */
+        .sidebar-section-title {{
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            color: #94A3B8 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.9px !important;
+            margin-top: 18px !important;
+            margin-bottom: 6px !important;
+            padding-left: 4px !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+        }}
+
+        /* Sidebar Button Alignment & Styling */
+        section[data-testid="stSidebar"] div.stButton > button {{
+            justify-content: flex-start !important;
+            text-align: left !important;
+            width: 100% !important;
+            padding: 0.45rem 0.85rem !important;
+            font-size: 13.5px !important;
+            font-weight: 500 !important;
+            letter-spacing: -0.15px !important;
+            border-radius: 8px !important;
+            margin-bottom: 2px !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+        }}
+
+        section[data-testid="stSidebar"] div.stButton > button[kind="primary"] {{
+            font-weight: 600 !important;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4) !important;
+            border: 1px solid rgba(255, 255, 255, 0.3) !important;
+        }}
+
+        /* Compact Wealth Card for Sidebar */
+        .sidebar-wealth-card {{
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-top: 8px;
+            margin-bottom: 14px;
+            backdrop-filter: blur(8px);
+        }}
+        .sidebar-wealth-row {{
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #94A3B8;
+            margin-bottom: 3px;
+        }}
+        .sidebar-wealth-row b {{
+            color: #F8FAFC;
+            font-family: 'JetBrains Mono', monospace;
+        }}
+        .sidebar-wealth-total {{
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            font-weight: 700;
+            color: #F8FAFC;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 6px;
+            margin-top: 5px;
+        }}
+        .sidebar-wealth-total b {{
+            color: #38BDF8;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13.5px;
+        }}
     </style>
     """, unsafe_allow_html=True)
 
