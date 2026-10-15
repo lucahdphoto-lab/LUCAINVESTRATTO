@@ -60,7 +60,16 @@ def render_import_view():
 
                 # Show extracted transactions
                 if parse_result.transactions:
+                    existing_tx_ids = {t.id for t in db.get_transactions(account_id=selected_account_id)}
+                    new_count = sum(1 for t in parse_result.transactions if t.id not in existing_tx_ids)
+                    already_count = len(parse_result.transactions) - new_count
+
                     st.markdown(f"#### 📄 Movimenti Estratti ({len(parse_result.transactions)} righe)")
+                    if already_count > 0:
+                        st.info(f"ℹ️ **Allineamento Incrementale Anti-Duplicati**: {new_count} nuovi movimenti da registrare, {already_count} movimenti già archiviati (verranno sincronizzati senza doppioni).")
+                    else:
+                        st.info(f"✨ **Prima Importazione**: Tutti i {new_count} movimenti sono nuovi e pronti per essere inseriti.")
+
                     preview_data = [
                         {
                             "Data": tx.date,
@@ -75,12 +84,21 @@ def render_import_view():
 
                     if st.button("🚀 Conferma ed Importa Transazioni nel Database", type="primary"):
                         saved = db.save_transactions(parse_result.transactions)
-                        st.success(f"Importate con successo {saved} transazioni nel conto selezionato!")
+                        st.success(f"Operazione completata con successo: inseriti {new_count} nuovi movimenti ({already_count} sincronizzati senza duplicati)!")
                         st.rerun()
 
                 # Show extracted holdings
                 if parse_result.holdings:
+                    existing_h_symbols = {h.symbol.upper() for h in db.get_holdings(account_id=selected_account_id)}
+                    new_h_count = sum(1 for h in parse_result.holdings if h.symbol.upper() not in existing_h_symbols)
+                    upd_h_count = len(parse_result.holdings) - new_h_count
+
                     st.markdown(f"#### 💼 Posizioni di Portafoglio Estratte ({len(parse_result.holdings)} titoli)")
+                    if upd_h_count > 0:
+                        st.info(f"ℹ️ **Aggiornamento Posizioni Esistenti**: {new_h_count} nuovi titoli da aggiungere, {upd_h_count} titoli già presenti di cui verranno aggiornati prezzi di mercato e quantità.")
+                    else:
+                        st.info(f"✨ **Primo Caricamento Portafoglio**: Tutti i {new_h_count} titoli verranno registrati.")
+
                     preview_holdings = [
                         {
                             "Simbolo": h.symbol,
@@ -97,7 +115,7 @@ def render_import_view():
 
                     if st.button("🚀 Conferma ed Importa Posizioni nel Portafoglio", type="primary"):
                         saved = db.save_holdings(parse_result.holdings)
-                        st.success(f"Importate con successo {saved} posizioni nel portafoglio!")
+                        st.success(f"Portafoglio aggiornato con successo: {saved} posizioni sincronizzate!")
                         st.rerun()
 
     with tab2:

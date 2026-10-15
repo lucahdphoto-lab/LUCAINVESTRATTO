@@ -3,6 +3,7 @@ Excel (.xlsx / .xls) parser for LUCAINVESTRATTO.
 Supports multi-sheet workbooks, automatic detection of bank statements and investment positions.
 """
 import io
+import hashlib
 from typing import List, Dict, Any, Optional
 import pandas as pd
 
@@ -66,7 +67,9 @@ def parse_excel(file_bytes: bytes, account_id: str, sheet_name: Optional[str] = 
             asset_class = str(row[class_col]).strip() if class_col and pd.notna(row[class_col]) else "Azionario (Equities)"
 
             if qty > 0:
+                h_id = f"h_{account_id}_{sym.strip().upper()}"
                 holdings_list.append(Holding(
+                    id=h_id,
                     account_id=account_id,
                     symbol=sym,
                     name=name,
@@ -122,7 +125,10 @@ def parse_excel(file_bytes: bytes, account_id: str, sheet_name: Optional[str] = 
                 tx_type = "Giroconto Interno (Transfer)"
                 cat = "Bonifico / Giroconto"
 
+            tx_sig = f"{account_id}_{iso_date}_{round(amt, 2)}_{desc.strip().lower()}"
+            tx_id = f"tx_{hashlib.md5(tx_sig.encode('utf-8')).hexdigest()[:12]}"
             tx_list.append(Transaction(
+                id=tx_id,
                 account_id=account_id,
                 date=iso_date,
                 type=tx_type,
