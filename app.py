@@ -44,7 +44,7 @@ st.set_page_config(
 # Load settings and apply dynamic visual theme
 app_settings = load_settings()
 active_colors = app_settings.get_active_colors()
-apply_theme(active_colors)
+apply_theme(app_settings)
 
 # Ensure sample demo data is loaded if database is empty on first boot
 db.load_demo_data(reset=False)

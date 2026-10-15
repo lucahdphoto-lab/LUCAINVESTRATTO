@@ -1,29 +1,63 @@
 """
 Financial Terminal styling and UI theme components for LUCAINVESTRATTO.
 Inspired by FactSet Workstation, Bloomberg Terminal, and modern private wealth dashboards.
-Supports dynamic theme presets, custom color palettes, and alert notification badges.
+Supports dynamic theme presets, custom color palettes, gradient buttons & cards,
+external background images, and adjustable glassmorphism transparency.
 """
 from typing import Optional, Dict, List
 import streamlit as st
+from lucainvestratto.settings import AppSettings, hex_to_rgba
 
 
-def apply_theme(colors: Optional[Dict[str, str]] = None):
-    if not colors:
-        colors = {
-            "primary_color": "#2563EB",
-            "header_bg_start": "#0F172A",
-            "header_bg_end": "#1E293B",
-            "card_border": "#CBD5E1",
-            "accent_color": "#38BDF8",
-            "positive_color": "#16A34A",
-            "negative_color": "#DC2626"
-        }
+def apply_theme(settings: Optional[AppSettings] = None):
+    if not settings:
+        settings = AppSettings()
 
+    colors = settings.get_active_colors()
     p_color = colors.get("primary_color", "#2563EB")
     h_start = colors.get("header_bg_start", "#0F172A")
     h_end = colors.get("header_bg_end", "#1E293B")
     accent = colors.get("accent_color", "#38BDF8")
     c_border = colors.get("card_border", "#CBD5E1")
+
+    # Button Gradients
+    if settings.gradient_buttons_enabled:
+        btn_start = settings.gradient_btn_start if settings.use_custom_colors else colors.get("btn_gradient_start", p_color)
+        btn_end = settings.gradient_btn_end if settings.use_custom_colors else colors.get("btn_gradient_end", "#1E40AF")
+    else:
+        btn_start = p_color
+        btn_end = p_color
+
+    # Card Transparency & Gradients
+    card_opacity = settings.card_opacity_pct / 100.0
+    card_blur = settings.card_blur_px
+
+    if settings.gradient_cards_enabled:
+        c_raw_start = settings.gradient_card_start if settings.use_custom_colors else colors.get("card_gradient_start", "#FFFFFF")
+        c_raw_end = settings.gradient_card_end if settings.use_custom_colors else colors.get("card_gradient_end", "#F8FAFC")
+    else:
+        c_raw_start = "#FFFFFF"
+        c_raw_end = "#FFFFFF"
+
+    card_start_rgba = hex_to_rgba(c_raw_start, opacity=card_opacity)
+    card_end_rgba = hex_to_rgba(c_raw_end, opacity=card_opacity)
+
+    # Background Image CSS
+    bg_image = settings.get_effective_background_image()
+    overlay_opacity = max(0.1, min(0.98, settings.background_overlay_opacity))
+    sidebar_opacity = max(0.4, min(1.0, settings.sidebar_opacity_pct / 100.0))
+
+    bg_css = ""
+    if bg_image:
+        bg_css = f"""
+        .stApp {{
+            background-image: linear-gradient(rgba(15, 23, 42, {overlay_opacity:.2f}), rgba(15, 23, 42, {overlay_opacity:.2f})), url('{bg_image}') !important;
+            background-size: cover !important;
+            background-position: center !important;
+            background-attachment: fixed !important;
+            background-repeat: no-repeat !important;
+        }}
+        """
 
     st.markdown(f"""
     <style>
@@ -34,6 +68,15 @@ def apply_theme(colors: Optional[Dict[str, str]] = None):
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }}
 
+        {bg_css}
+
+        /* Sidebar Glassmorphism */
+        section[data-testid="stSidebar"] {{
+            background: rgba(15, 23, 42, {sidebar_opacity:.2f}) !important;
+            backdrop-filter: blur({card_blur}px) !important;
+            -webkit-backdrop-filter: blur({card_blur}px) !important;
+        }}
+
         /* Dynamic Header Brand */
         .brand-header {{
             background: linear-gradient(135deg, {h_start} 0%, {h_end} 100%);
@@ -41,7 +84,9 @@ def apply_theme(colors: Optional[Dict[str, str]] = None):
             border-radius: 12px;
             padding: 20px 24px;
             margin-bottom: 24px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.18);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+            backdrop-filter: blur({card_blur}px);
+            -webkit-backdrop-filter: blur({card_blur}px);
         }}
         .brand-title {{
             color: #F8FAFC;
@@ -56,25 +101,27 @@ def apply_theme(colors: Optional[Dict[str, str]] = None):
             gap: 10px;
         }}
         .brand-badge {{
-            background: {p_color};
+            background: linear-gradient(135deg, {btn_start} 0%, {btn_end} 100%);
             color: #FFFFFF;
             font-size: 11px;
             font-weight: 600;
-            padding: 3px 8px;
+            padding: 4px 10px;
             border-radius: 6px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }}
         .alert-pill {{
-            background: #DC2626;
+            background: linear-gradient(135deg, #DC2626 0%, #991B1B 100%);
             color: #FFFFFF;
             font-size: 11px;
             font-weight: 700;
-            padding: 4px 10px;
+            padding: 4px 12px;
             border-radius: 20px;
             display: inline-flex;
             align-items: center;
             gap: 5px;
+            box-shadow: 0 2px 10px rgba(220, 38, 38, 0.4);
             animation: pulse-alert 2s infinite;
         }}
         @keyframes pulse-alert {{
@@ -89,18 +136,48 @@ def apply_theme(colors: Optional[Dict[str, str]] = None):
             margin-bottom: 0;
         }}
 
-        /* KPI Metric Card */
+        /* Buttons with Degrading Gradients (Sfumature degradanti) */
+        .stButton > button[kind="primary"], div[data-testid="stFormSubmitButton"] > button, .stDownloadButton > button {{
+            background: linear-gradient(135deg, {btn_start} 0%, {btn_end} 100%) !important;
+            color: #FFFFFF !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            border-radius: 8px !important;
+            font-weight: 600 !important;
+            padding: 0.45rem 1.1rem !important;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18) !important;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }}
+        .stButton > button[kind="primary"]:hover, div[data-testid="stFormSubmitButton"] > button:hover, .stDownloadButton > button:hover {{
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28) !important;
+            filter: brightness(1.1) !important;
+        }}
+        .stButton > button[kind="secondary"] {{
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%) !important;
+            backdrop-filter: blur({card_blur}px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            border-radius: 8px !important;
+            transition: all 0.2s ease !important;
+        }}
+        .stButton > button[kind="secondary"]:hover {{
+            transform: translateY(-1px) !important;
+            border-color: {p_color} !important;
+        }}
+
+        /* KPI Metric Card with Gradients & Transparency */
         .kpi-card {{
-            background: #FFFFFF;
-            border: 1px solid {c_border};
-            border-radius: 10px;
+            background: linear-gradient(135deg, {card_start_rgba} 0%, {card_end_rgba} 100%) !important;
+            backdrop-filter: blur({card_blur}px) !important;
+            -webkit-backdrop-filter: blur({card_blur}px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            border-radius: 12px;
             padding: 16px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }}
         .kpi-card:hover {{
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
         }}
         .kpi-label {{
             color: #64748B;
@@ -133,8 +210,7 @@ def apply_theme(colors: Optional[Dict[str, str]] = None):
 
         @media (prefers-color-scheme: dark) {{
             .kpi-card {{
-                background: #1E293B;
-                border-color: #334155;
+                border-color: rgba(255, 255, 255, 0.12) !important;
             }}
             .kpi-label {{
                 color: #94A3B8;
@@ -155,19 +231,20 @@ def apply_theme(colors: Optional[Dict[str, str]] = None):
             display: flex;
             align-items: flex-start;
             gap: 12px;
+            backdrop-filter: blur({card_blur}px);
         }}
         .notif-danger {{
-            background: #FEF2F2;
+            background: rgba(254, 242, 242, 0.9);
             border: 1px solid #FCA5A5;
             color: #991B1B;
         }}
         .notif-warning {{
-            background: #FFFBEB;
+            background: rgba(255, 251, 235, 0.9);
             border: 1px solid #FCD34D;
             color: #92400E;
         }}
         .notif-info {{
-            background: #EFF6FF;
+            background: rgba(239, 246, 255, 0.9);
             border: 1px solid #BFDBFE;
             color: #1E40AF;
         }}

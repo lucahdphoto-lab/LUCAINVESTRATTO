@@ -148,6 +148,21 @@ ESTRATTO CONTO BANCARIO MENSILE
         remaining = len(db.get_transactions())
         self.assertEqual(initial_count - deleted, remaining)
 
+    def test_gradients_and_background_transparency(self):
+        from lucainvestratto.settings import hex_to_rgba, PRESET_BACKGROUND_IMAGES
+        rgba = hex_to_rgba("#2563EB", opacity=0.85)
+        self.assertTrue(rgba.startswith("rgba(37, 99, 235"))
+        self.assertIn("0.850", rgba)
+
+        settings = AppSettings(
+            gradient_buttons_enabled=True,
+            background_type="image_preset",
+            background_preset_key="Trading Floor & Financial Displays",
+            card_opacity_pct=85.0
+        )
+        bg = settings.get_effective_background_image()
+        self.assertIn("http", bg)
+
 
 if __name__ == "__main__":
     unittest.main()
