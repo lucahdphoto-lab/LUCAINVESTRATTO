@@ -11,7 +11,7 @@ import random
 
 from contextlib import contextmanager
 
-from lucainvestratto.models import BankAccount, Transaction, Holding
+from lucainvestratto.models import BankAccount, Transaction, Holding, PortfolioSnapshot
 
 DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "lucainvestratto.db")
 
@@ -88,6 +88,23 @@ class Database:
                 duration REAL DEFAULT 0.0,
                 notes TEXT,
                 FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE CASCADE
+            )
+            """)
+
+            # Monthly Portfolio Snapshots Table
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS snapshots (
+                id TEXT PRIMARY KEY,
+                account_id TEXT NOT NULL,
+                snapshot_date TEXT NOT NULL,
+                total_wealth REAL NOT NULL,
+                liquid_cash REAL DEFAULT 0.0,
+                invested_amount REAL DEFAULT 0.0,
+                allocations_json TEXT,
+                image_filename TEXT,
+                image_base64 TEXT,
+                notes TEXT,
+                created_at TEXT
             )
             """)
             conn.commit()
@@ -208,6 +225,7 @@ class Database:
     def factory_reset(self) -> None:
         with self._get_connection() as conn:
             cursor = conn.cursor()
+            cursor.execute("DELETE FROM snapshots")
             cursor.execute("DELETE FROM holdings")
             cursor.execute("DELETE FROM transactions")
             cursor.execute("DELETE FROM accounts")
@@ -265,11 +283,47 @@ class Database:
                 cursor.execute("DELETE FROM holdings")
             conn.commit()
 
+    # ================= SNAPSHOTS =================
+    def get_snapshots(self, account_id: Optional[str] = None) -> List[PortfolioSnapshot]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            if account_id and account_id != "all":
+                cursor.execute("SELECT * FROM snapshots WHERE account_id = ? ORDER BY snapshot_date ASC", (account_id,))
+            else:
+                cursor.execute("SELECT * FROM snapshots ORDER BY snapshot_date ASC")
+            rows = cursor.fetchall()
+            return [PortfolioSnapshot.from_dict(dict(r)) for r in rows]
+
+    def get_snapshot_by_id(self, snapshot_id: str) -> Optional[PortfolioSnapshot]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM snapshots WHERE id = ?", (snapshot_id,))
+            row = cursor.fetchone()
+            return PortfolioSnapshot.from_dict(dict(row)) if row else None
+
+    def save_snapshot(self, snapshot: PortfolioSnapshot) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            INSERT OR REPLACE INTO snapshots (id, account_id, snapshot_date, total_wealth, liquid_cash, invested_amount, allocations_json, image_filename, image_base64, notes, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (snapshot.id, snapshot.account_id, snapshot.snapshot_date, snapshot.total_wealth,
+                  snapshot.liquid_cash, snapshot.invested_amount, snapshot.allocations_json,
+                  snapshot.image_filename, snapshot.image_base64, snapshot.notes, snapshot.created_at))
+            conn.commit()
+
+    def delete_snapshot(self, snapshot_id: str) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM snapshots WHERE id = ?", (snapshot_id,))
+            conn.commit()
+
     # ================= DEMO DATA LOADER =================
     def load_demo_data(self, reset: bool = False) -> None:
         if reset:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
+                cursor.execute("DELETE FROM snapshots")
                 cursor.execute("DELETE FROM holdings")
                 cursor.execute("DELETE FROM transactions")
                 cursor.execute("DELETE FROM accounts")
@@ -623,6 +677,71 @@ class Database:
         # Save all transactions
         self.save_transactions(transactions)
 
+        # 4. Realistic Monthly Snapshots (Fotografie Situazione e Quadratura)
+        d_snap1 = (base_date - timedelta(days=60)).isoformat()
+        d_snap2 = (base_date - timedelta(days=30)).isoformat()
+        d_snap3 = (base_date - timedelta(days=2)).isoformat()
+
+        import json
+        snap1 = PortfolioSnapshot(
+            id="snap_2026_m1",
+            account_id="all",
+            snapshot_date=d_snap1,
+            total_wealth=217400.0,
+            liquid_cash=51100.0,
+            invested_amount=166300.0,
+            allocations_json=json.dumps([
+                {"asset_class": "Azionario Globale (ETF)", "amount": 88000.0, "weight_pct": 40.5},
+                {"asset_class": "Liquidità & Conti Deposito", "amount": 51100.0, "weight_pct": 23.5},
+                {"asset_class": "Obbligazionario Governativo", "amount": 45300.0, "weight_pct": 20.8},
+                {"asset_class": "Azioni Singole USA (Tech)", "amount": 33000.0, "weight_pct": 15.2}
+            ], ensure_ascii=False),
+            image_filename="estratto_sintesi_patrimoniale_m1.png",
+            image_base64="",
+            notes="Riepilogo fotografico da home banking (2 mesi fa). Quadratura con movimenti storici."
+        )
+
+        snap2 = PortfolioSnapshot(
+            id="snap_2026_m2",
+            account_id="all",
+            snapshot_date=d_snap2,
+            total_wealth=224850.0,
+            liquid_cash=53200.0,
+            invested_amount=171650.0,
+            allocations_json=json.dumps([
+                {"asset_class": "Azionario Globale (ETF)", "amount": 92200.0, "weight_pct": 41.0},
+                {"asset_class": "Liquidità & Conti Deposito", "amount": 53200.0, "weight_pct": 23.7},
+                {"asset_class": "Obbligazionario Governativo", "amount": 45150.0, "weight_pct": 20.1},
+                {"asset_class": "Azioni Singole USA (Tech)", "amount": 34300.0, "weight_pct": 15.2}
+            ], ensure_ascii=False),
+            image_filename="estratto_sintesi_patrimoniale_m2.png",
+            image_base64="",
+            notes="Fotografia patrimonio fine mese scorso. Incremento azionario globale da PAC."
+        )
+
+        snap3 = PortfolioSnapshot(
+            id="snap_2026_m3",
+            account_id="all",
+            snapshot_date=d_snap3,
+            total_wealth=231330.90,
+            liquid_cash=55738.90,
+            invested_amount=175592.00,
+            allocations_json=json.dumps([
+                {"asset_class": "Azionario Globale (ETF)", "amount": 95400.0, "weight_pct": 41.2},
+                {"asset_class": "Liquidità & Conti Deposito", "amount": 55738.9, "weight_pct": 24.1},
+                {"asset_class": "Obbligazionario Governativo", "amount": 45200.0, "weight_pct": 19.5},
+                {"asset_class": "Azioni Singole USA (Tech)", "amount": 34992.0, "weight_pct": 15.1}
+            ], ensure_ascii=False),
+            image_filename="estratto_sintesi_patrimoniale_m3.png",
+            image_base64="",
+            notes="Ultima fotografia mensile. Quadratura perfetta verificata con estratti e dossier titoli."
+        )
+
+        self.save_snapshot(snap1)
+        self.save_snapshot(snap2)
+        self.save_snapshot(snap3)
+
 
 # Singleton database instance
 db = Database()
+

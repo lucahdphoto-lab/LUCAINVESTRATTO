@@ -29,6 +29,7 @@ from lucainvestratto.ui.views import (
     render_cashflow_view,
     render_asset_view,
     render_investment_view,
+    render_snapshots_view,
     render_export_view,
     render_settings_view
 )
@@ -102,6 +103,7 @@ with st.sidebar:
             "📅 Estratto Conto per Data",
             "💼 Analisi per Asset",
             "📈 Analisi Investimento (FactSet)",
+            "📸 Snapshot & Quadratura Mensile",
             "📥 Import Dati (.xlsx, .csv, .txt, .img)",
             "🏦 Gestione Conti Bancari",
             "📑 Esportazione Report (.pdf, .xlsx, .txt)",
@@ -237,6 +239,9 @@ elif nav_choice == "💼 Analisi per Asset":
 
 elif nav_choice == "📈 Analisi Investimento (FactSet)":
     render_investment_view(selected_account_id=selected_account_id)
+
+elif nav_choice == "📸 Snapshot & Quadratura Mensile":
+    render_snapshots_view()
 
 elif nav_choice == "📥 Import Dati (.xlsx, .csv, .txt, .img)":
     render_import_view()

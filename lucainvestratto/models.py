@@ -136,3 +136,37 @@ class RiskMetrics:
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
+
+@dataclass
+class PortfolioSnapshot:
+    id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
+    account_id: str = "all"
+    snapshot_date: str = field(default_factory=lambda: date.today().isoformat())
+    total_wealth: float = 0.0
+    liquid_cash: float = 0.0
+    invested_amount: float = 0.0
+    allocations_json: str = "[]"  # JSON list of dicts: [{"asset_class": "...", "amount": 1000.0, "weight_pct": 20.0}]
+    image_filename: str = ""
+    image_base64: str = ""
+    notes: str = ""
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+
+    def get_allocations(self) -> list:
+        import json
+        try:
+            return json.loads(self.allocations_json) if self.allocations_json else []
+        except Exception:
+            return []
+
+    def set_allocations(self, alloc_list: list) -> None:
+        import json
+        self.allocations_json = json.dumps(alloc_list, ensure_ascii=False)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "PortfolioSnapshot":
+        clean = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
+        return cls(**clean)

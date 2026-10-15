@@ -52,6 +52,10 @@ def clean_number(val: Any) -> float:
     elif "," in s:
         # e.g. 1234,56 -> replace comma with dot
         s = s.replace(",", ".")
+    elif "." in s:
+        # Check if dot is thousands separator (e.g. 30.000 or 1.500.000)
+        if re.match(r"^[+-]?\d{1,3}(\.\d{3})+$", s):
+            s = s.replace(".", "")
 
     try:
         return float(s)
