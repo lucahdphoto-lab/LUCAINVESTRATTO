@@ -2,7 +2,8 @@
 Settings and configuration view for LUCAINVESTRATTO.
 Includes:
 1. Color theme selection, custom color pickers, degrading gradients (buttons and windows),
-   external background image customization, and glassmorphism transparency controls.
+   external background image customization, and glassmorphism transparency controls,
+   featuring an interactive STICKY LATERAL POP-UP PREVIEW that updates in real time.
 2. Custom threshold alerts and active notification center.
 3. Selective reset functions (transactions, holdings, date-filtered, accounts).
 4. Data recalculation, integrity diagnostics, and running balance alignment.
@@ -10,6 +11,7 @@ Includes:
 import base64
 import streamlit as st
 import pandas as pd
+import plotly.graph_objects as go
 from datetime import date, timedelta
 
 from lucainvestratto.db import db
@@ -23,8 +25,8 @@ from lucainvestratto.analytics.recalc import run_data_audit, execute_recalculati
 def render_settings_view():
     st.subheader("⚙️ Impostazioni: Colori, Sfumature, Sfondo, Trasparenze & Alert")
     st.markdown("""
-    Personalizza l'aspetto visivo con **sfumature degradanti**, **immagini di sfondo esterne**,
-    **regolazione delle trasparenze (effetto vetro satinato)**, imposta regole di alert e gestisci l'integrità del database.
+    Personalizza l'interfaccia grafica con **sfumature degradanti**, **immagini di sfondo**,
+    e **trasparenze con effetto vetro**, osservando i cambiamenti in tempo reale nel **pop-up laterale di anteprima**.
     """)
 
     settings = load_settings()
@@ -33,218 +35,308 @@ def render_settings_view():
     transactions = db.get_transactions()
 
     tab1, tab2, tab3, tab4 = st.tabs([
-        "🎨 Colori, Sfumature & Sfondo",
+        "🎨 Colori, Sfumature & Sfondo (con Pop-Up Anteprima)",
         "🔔 Notifiche & Alert Personalizzati",
         "🧹 Azzeramento Selettivo Dati",
         "🔄 Ricalcolo & Allineamento Dati"
     ])
 
-    # ================= TAB 1: MODIFICA E SCELTA COLORI, SFUMATURE, SFONDO, TRASPARENZE =================
+    # ================= TAB 1: MODIFICA COLORI CON POP-UP LATERALE =================
     with tab1:
-        st.markdown("#### 🎨 Palette & Temi Finanziari Predefiniti")
-        preset_options = list(THEME_PRESETS.keys())
-        preset_labels = {k: v["name"] for k, v in THEME_PRESETS.items()}
+        col_ctrl, col_popup = st.columns([1.5, 1.3], gap="large")
 
-        current_idx = preset_options.index(settings.theme_preset) if settings.theme_preset in preset_options else 0
-        chosen_preset = st.selectbox(
-            "Seleziona Tema Predefinito:",
-            options=preset_options,
-            format_func=lambda k: preset_labels[k],
-            index=current_idx
-        )
+        # ---------------- CONTROLS COLUMN (LEFT) ----------------
+        with col_ctrl:
+            st.markdown("#### 🎨 Palette & Temi Finanziari Predefiniti")
+            preset_options = list(THEME_PRESETS.keys())
+            preset_labels = {k: v["name"] for k, v in THEME_PRESETS.items()}
 
-        preset_colors = THEME_PRESETS[chosen_preset]
-        
-        # Color Preview Badges
-        st.markdown(f"""
-        <div style="display: flex; gap: 10px; margin: 10px 0 16px 0; align-items: center; flex-wrap: wrap;">
-            <div style="background: {preset_colors['primary_color']}; color: #FFF; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 11.5px;">
-                Primario: {preset_colors['primary_color']}
-            </div>
-            <div style="background: {preset_colors['header_bg_start']}; color: #FFF; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 11.5px; border: 1px solid #475569;">
-                Header: {preset_colors['header_bg_start']}
-            </div>
-            <div style="background: {preset_colors['accent_color']}; color: #000; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 11.5px;">
-                Accento: {preset_colors['accent_color']}
-            </div>
-            <div style="background: {preset_colors['positive_color']}; color: #FFF; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 11.5px;">
-                Guadagni: {preset_colors['positive_color']}
-            </div>
-            <div style="background: {preset_colors['negative_color']}; color: #FFF; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 11.5px;">
-                Perdite: {preset_colors['negative_color']}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+            current_idx = preset_options.index(settings.theme_preset) if settings.theme_preset in preset_options else 0
+            chosen_preset = st.selectbox(
+                "Seleziona Tema Predefinito:",
+                options=preset_options,
+                format_func=lambda k: preset_labels[k],
+                index=current_idx,
+                key="theme_preset_select"
+            )
 
-        st.markdown("---")
-        # 1. SFUMATURE DEGRADANTI
-        st.markdown("#### 🌈 1. Sfumature Degradanti per Finestre e Pulsanti")
-        st.caption("Configura sfumature cromatiche dinamiche a due o più tonalità per bottoni e riquadri informativi.")
+            preset_colors = THEME_PRESETS[chosen_preset]
 
-        c_grad1, c_grad2 = st.columns(2)
-        with c_grad1:
-            st.markdown("##### 🔘 Sfumatura Degradante Pulsanti")
-            grad_btn_en = st.toggle("Abilita Gradiente sui Pulsanti", value=settings.gradient_buttons_enabled)
-            col_b1, col_b2 = st.columns(2)
-            with col_b1:
-                btn_start = st.color_picker("Colore Iniziale Gradiente Pulsante", value=settings.gradient_btn_start)
-            with col_b2:
-                btn_end = st.color_picker("Colore Finale Gradiente Pulsante", value=settings.gradient_btn_end)
+            st.markdown("---")
+            # 1. SFUMATURE DEGRADANTI
+            st.markdown("#### 🌈 1. Sfumature Degradanti per Finestre e Pulsanti")
+            
+            c_grad1, c_grad2 = st.columns(2)
+            with c_grad1:
+                st.markdown("##### 🔘 Sfumatura Pulsanti")
+                grad_btn_en = st.toggle("Abilita Gradiente sui Pulsanti", value=settings.gradient_buttons_enabled, key="toggle_grad_btn")
+                btn_start = st.color_picker(
+                    "Colore Iniziale Pulsante",
+                    value=settings.gradient_btn_start if settings.gradient_buttons_enabled else preset_colors["primary_color"],
+                    key="cp_btn_start"
+                )
+                btn_end = st.color_picker(
+                    "Colore Finale Pulsante",
+                    value=settings.gradient_btn_end if settings.gradient_buttons_enabled else preset_colors.get("btn_gradient_end", "#1E40AF"),
+                    key="cp_btn_end"
+                )
 
-            # Live preview of button
+            with c_grad2:
+                st.markdown("##### 🪟 Sfumatura Finestre / Card")
+                grad_card_en = st.toggle("Abilita Gradiente sulle Card", value=settings.gradient_cards_enabled, key="toggle_grad_card")
+                card_start = st.color_picker(
+                    "Colore Iniziale Card",
+                    value=settings.gradient_card_start if settings.gradient_cards_enabled else preset_colors.get("card_gradient_start", "#FFFFFF"),
+                    key="cp_card_start"
+                )
+                card_end = st.color_picker(
+                    "Colore Finale Card",
+                    value=settings.gradient_card_end if settings.gradient_cards_enabled else preset_colors.get("card_gradient_end", "#F8FAFC"),
+                    key="cp_card_end"
+                )
+
+            st.markdown("---")
+            # 2. SFONDO CON IMMAGINI ESTERNE
+            st.markdown("#### 🖼️ 2. Modifica Sfondo con Immagini Esterne")
+            bg_mode_options = [
+                "Colore Piatto / Gradiente Standard",
+                "Wallpaper Finanziari ad Alta Definizione (Preset)",
+                "URL Immagine Esterna Web",
+                "Carica File Immagine dal Tuo Computer (.jpg, .png)"
+            ]
+            
+            init_bg_idx = 0
+            if settings.background_type == "image_preset":
+                init_bg_idx = 1
+            elif settings.background_type == "image_url":
+                init_bg_idx = 2
+            elif settings.background_type == "image_upload":
+                init_bg_idx = 3
+
+            selected_bg_mode = st.radio("Modalità Sfondo Applicazione:", options=bg_mode_options, index=init_bg_idx, key="radio_bg_mode")
+
+            bg_type_selected = "default"
+            bg_preset_selected = settings.background_preset_key
+            bg_url_selected = settings.background_image_url
+            bg_base64_selected = settings.background_image_base64
+            effective_bg_for_preview = ""
+
+            if selected_bg_mode == "Wallpaper Finanziari ad Alta Definizione (Preset)":
+                bg_type_selected = "image_preset"
+                preset_img_keys = list(PRESET_BACKGROUND_IMAGES.keys())
+                curr_p_idx = preset_img_keys.index(settings.background_preset_key) if settings.background_preset_key in preset_img_keys else 1
+                bg_preset_selected = st.selectbox("Scegli Wallpaper Istituzionale:", preset_img_keys, index=curr_p_idx, key="sb_bg_preset")
+                effective_bg_for_preview = PRESET_BACKGROUND_IMAGES.get(bg_preset_selected, "")
+
+            elif selected_bg_mode == "URL Immagine Esterna Web":
+                bg_type_selected = "image_url"
+                bg_url_selected = st.text_input(
+                    "Inserisci URL pubblico dell'immagine (.jpg, .png):",
+                    value=settings.background_image_url,
+                    placeholder="https://images.unsplash.com/photo-...",
+                    key="txt_bg_url"
+                )
+                effective_bg_for_preview = bg_url_selected.strip()
+
+            elif selected_bg_mode == "Carica File Immagine dal Tuo Computer (.jpg, .png)":
+                bg_type_selected = "image_upload"
+                uploaded_bg = st.file_uploader("Seleziona file immagine:", type=["png", "jpg", "jpeg", "webp"], key="upload_bg_file")
+                if uploaded_bg is not None:
+                    img_bytes = uploaded_bg.read()
+                    mime = uploaded_bg.type or "image/jpeg"
+                    bg_base64_selected = f"data:{mime};base64,{base64.b64encode(img_bytes).decode('utf-8')}"
+                    effective_bg_for_preview = bg_base64_selected
+                elif settings.background_image_base64:
+                    effective_bg_for_preview = settings.background_image_base64
+                    st.caption("Immagine caricata in precedenza già memorizzata.")
+            else:
+                bg_type_selected = "default"
+                effective_bg_for_preview = ""
+
+            overlay_op = st.slider(
+                "Opacità Velo di Copertura Sfondo (% oscuramento per leggibilità):",
+                min_value=10, max_value=98, value=int(settings.background_overlay_opacity * 100), step=2, key="sl_overlay_op"
+            )
+
+            st.markdown("---")
+            # 3. REGOLAZIONE TRASPARENZE E EFFETTO GLASSMORPHISM
+            st.markdown("#### 🪟 3. Regolazione Trasparenze & Vetro Satinato (Glassmorphism)")
+            col_t1, col_t2 = st.columns(2)
+            with col_t1:
+                card_op = st.slider("Opacità Finestre e Card (%)", min_value=20, max_value=100, value=int(settings.card_opacity_pct), step=5, key="sl_card_op")
+                side_op = st.slider("Opacità Barra Laterale Sidebar (%)", min_value=40, max_value=100, value=int(settings.sidebar_opacity_pct), step=5, key="sl_side_op")
+            with col_t2:
+                blur_px = st.slider("Intensità Sfocatura Vetro (Blur in px)", min_value=0, max_value=30, value=int(settings.card_blur_px), step=2, key="sl_blur_px")
+
+            st.markdown("---")
+            use_custom = st.checkbox("Abilita colori primari e accento personalizzati", value=settings.use_custom_colors, key="chk_use_custom")
+            c_cp1, c_cp2 = st.columns(2)
+            with c_cp1:
+                custom_p = st.color_picker("Colore Primario Base", value=settings.custom_primary_color, key="cp_custom_p")
+            with c_cp2:
+                custom_a = st.color_picker("Colore Accento Base", value=settings.custom_accent_color, key="cp_custom_a")
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("💾 Salva e Applica Configurazione Completa", type="primary", use_container_width=True, key="btn_save_all_settings"):
+                settings.theme_preset = chosen_preset
+                settings.use_custom_colors = use_custom
+                settings.custom_primary_color = custom_p
+                settings.custom_accent_color = custom_a
+                
+                # Gradients
+                settings.gradient_buttons_enabled = grad_btn_en
+                settings.gradient_btn_start = btn_start
+                settings.gradient_btn_end = btn_end
+                settings.gradient_cards_enabled = grad_card_en
+                settings.gradient_card_start = card_start
+                settings.gradient_card_end = card_end
+
+                # Background
+                settings.background_type = bg_type_selected
+                settings.background_preset_key = bg_preset_selected
+                settings.background_image_url = bg_url_selected
+                settings.background_image_base64 = bg_base64_selected
+                settings.background_overlay_opacity = overlay_op / 100.0
+
+                # Transparency
+                settings.card_opacity_pct = float(card_op)
+                settings.card_blur_px = int(blur_px)
+                settings.sidebar_opacity_pct = float(side_op)
+
+                save_settings(settings)
+                st.toast("✅ Configurazione salvata con successo!")
+                st.rerun()
+
+        # ---------------- LIVE STICKY POP-UP PREVIEW COLUMN (RIGHT) ----------------
+        with col_popup:
+            # Sticky CSS container
+            st.markdown("""
+            <style>
+                .preview-sticky-box {
+                    position: -webkit-sticky;
+                    position: sticky;
+                    top: 24px;
+                    z-index: 1000;
+                    margin-bottom: 24px;
+                }
+            </style>
+            """, unsafe_allow_html=True)
+
+            st.markdown('<div class="preview-sticky-box">', unsafe_allow_html=True)
+            
+            # Pop-up Card Header with Live Indicator
+            c_head1, c_head2 = st.columns([3, 2])
+            with c_head1:
+                st.markdown("### 📱 Pop-Up Anteprima Live")
+            with c_head2:
+                st.markdown("""
+                <div style="text-align: right; padding-top: 6px;">
+                    <span style="background: #16A34A; color: #FFF; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 12px; display: inline-flex; align-items: center; gap: 4px;">
+                        <span style="width: 6px; height: 6px; border-radius: 50%; background: #FFF; display: inline-block;"></span>
+                        LIVE UPDATE
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
+
+            st.caption("Questo riquadro riflette istantaneamente le tue modifiche a colori, trasparenze, sfumature e sfondo.")
+
+            # Compute preview styles
+            card_start_rgba = hex_to_rgba(card_start, opacity=card_op / 100.0)
+            card_end_rgba = hex_to_rgba(card_end, opacity=card_op / 100.0)
+            overlay_val = overlay_op / 100.0
+
+            # Background CSS for the live simulator box
+            if effective_bg_for_preview:
+                preview_bg_css = f"background: linear-gradient(rgba(15, 23, 42, {overlay_val:.2f}), rgba(15, 23, 42, {overlay_val:.2f})), url('{effective_bg_for_preview}'); background-size: cover; background-position: center;"
+            else:
+                preview_bg_css = f"background: linear-gradient(135deg, {preset_colors['header_bg_start']} 0%, {preset_colors['header_bg_end']} 100%);"
+
+            # Render Simulator Sandbox Box
             st.markdown(f"""
-            <div style="margin-top: 8px;">
-                <button style="background: linear-gradient(135deg, {btn_start} 0%, {btn_end} 100%); color: #FFF; border: none; border-radius: 8px; padding: 8px 18px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.2); cursor: pointer;">
-                    Anteprima Pulsante con Sfumatura ✨
-                </button>
+            <div style="{preview_bg_css} border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 16px; padding: 18px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35); margin-bottom: 12px;">
+                <!-- Mini Brand Header -->
+                <div style="background: linear-gradient(135deg, {preset_colors['header_bg_start']} 0%, {preset_colors['header_bg_end']} 100%); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="color: #F8FAFC; font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 6px;">
+                        <span>🏛️ LUCAINVESTRATTO</span>
+                        <span style="background: linear-gradient(135deg, {btn_start} 0%, {btn_end} 100%); color: #FFF; font-size: 9px; padding: 2px 6px; border-radius: 4px; font-weight: 700;">PRO</span>
+                    </div>
+                    <span style="background: linear-gradient(135deg, #DC2626 0%, #991B1B 100%); color: #FFF; font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 10px;">⚠️ ALERT</span>
+                </div>
+
+                <!-- Glassmorphism KPI Metric Card with Gradients & Transparency -->
+                <div style="background: linear-gradient(135deg, {card_start_rgba} 0%, {card_end_rgba} 100%); backdrop-filter: blur({blur_px}px); -webkit-backdrop-filter: blur({blur_px}px); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 12px; padding: 14px; margin-bottom: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.15);">
+                    <div style="font-size: 10.5px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Patrimonio Netto Totale (Simulato)</div>
+                    <div style="font-size: 22px; font-weight: 800; color: #0F172A; font-family: monospace; margin: 4px 0;">€ 201.415,89</div>
+                    <div style="font-size: 11px; font-weight: 600; color: #16A34A;">▲ +25,99% (+€ 41.520,00) • Sharpe: 1.45</div>
+                </div>
+
+                <!-- Action Button with Degrading Gradient -->
+                <div style="display: flex; gap: 10px; margin-bottom: 14px;">
+                    <button style="background: linear-gradient(135deg, {btn_start} 0%, {btn_end} 100%); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.25); border-radius: 8px; padding: 8px 16px; font-weight: 600; font-size: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.25); width: 100%; cursor: pointer;">
+                        🚀 Pulsante Azione con Sfumatura
+                    </button>
+                    <button style="background: rgba(255,255,255,0.12); backdrop-filter: blur({blur_px}px); color: #FFF; border: 1px solid rgba(255,255,255,0.25); border-radius: 8px; padding: 8px 14px; font-weight: 600; font-size: 12px; cursor: pointer;">
+                        Filtro
+                    </button>
+                </div>
+
+                <!-- Glassmorphism Mini Chart Card -->
+                <div style="background: linear-gradient(135deg, {card_start_rgba} 0%, {card_end_rgba} 100%); backdrop-filter: blur({blur_px}px); -webkit-backdrop-filter: blur({blur_px}px); border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 12px; padding: 12px;">
+                    <div style="font-size: 10.5px; font-weight: 700; color: #64748B; margin-bottom: 4px;">📈 ANDAMENTO PORTAFOGLIO VS BENCHMARK</div>
+                    <div style="height: 140px;" id="mini_chart_container">
+            """, unsafe_allow_html=True)
+
+            # Mini live chart themed with the selected colors
+            fig_mini = go.Figure()
+            fig_mini.add_trace(go.Scatter(
+                x=["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott"],
+                y=[100, 102.5, 101.8, 106.2, 105.0, 111.4, 114.2, 112.8, 119.5, 125.9],
+                mode="lines",
+                name="Portafoglio",
+                line=dict(color=btn_start, width=2.5),
+                fill="tozeroy",
+                fillcolor=hex_to_rgba(btn_start, opacity=0.18)
+            ))
+            fig_mini.add_trace(go.Scatter(
+                x=["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott"],
+                y=[100, 101.2, 102.0, 104.5, 103.8, 107.1, 108.5, 107.9, 111.2, 114.0],
+                mode="lines",
+                name="Benchmark",
+                line=dict(color="#94A3B8", width=1.5, dash="dot")
+            ))
+            fig_mini.update_layout(
+                margin=dict(l=5, r=5, t=5, b=5),
+                height=135,
+                hovermode=False,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                xaxis=dict(showgrid=False, showticklabels=True, color="#94A3B8", tickfont=dict(size=9)),
+                yaxis=dict(showgrid=True, gridcolor="rgba(148, 163, 184, 0.15)", showticklabels=False),
+                showlegend=False
+            )
+            st.plotly_chart(fig_mini, use_container_width=True, config={"displayModeBar": False})
+
+            st.markdown("""
+                    </div>
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
-        with c_grad2:
-            st.markdown("##### 🪟 Sfumatura Degradante Finestre e Card")
-            grad_card_en = st.toggle("Abilita Gradiente sulle Card", value=settings.gradient_cards_enabled)
-            col_c1, col_c2 = st.columns(2)
-            with col_c1:
-                card_start = st.color_picker("Colore Iniziale Card", value=settings.gradient_card_start)
-            with col_c2:
-                card_end = st.color_picker("Colore Finale Card", value=settings.gradient_card_end)
+            # Popover for modal view
+            with st.popover("🔎 Apri Pop-Up Ingrandito a Finestra Modale"):
+                st.markdown("#### 🖼️ Vista Pop-Up a Schermo Intero")
+                st.caption("Rappresentazione ingrandita della dashboard con le impostazioni correnti:")
+                st.markdown(f"""
+                <div style="{preview_bg_css} border-radius: 14px; padding: 24px; color: #FFF;">
+                    <div style="background: linear-gradient(135deg, {card_start_rgba} 0%, {card_end_rgba} 100%); backdrop-filter: blur({blur_px}px); border-radius: 12px; padding: 20px; color: #0F172A;">
+                        <h3 style="margin-top:0;">Dettaglio Rendimento con Trasparenza al {card_op}%</h3>
+                        <p>Questo effetto di trasparenza garantisce che lo sfondo risalti mantenendo la massima leggibilità.</p>
+                        <button style="background: linear-gradient(135deg, {btn_start} 0%, {btn_end} 100%); color: #FFF; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold;">Pulsante Degradante</button>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
-        st.markdown("---")
-        # 2. SFONDO CON IMMAGINI ESTERNE
-        st.markdown("#### 🖼️ 2. Modifica Sfondo con Immagini Esterne")
-        st.caption("Imposta una grafica di sfondo ad alta definizione (trading floor, architettura o URL personalizzato).")
-
-        bg_mode_options = [
-            "Colore Piatto / Gradiente Standard",
-            "Wallpaper Finanziari ad Alta Definizione (Preset)",
-            "URL Immagine Esterna Web",
-            "Carica File Immagine dal Tuo Computer (.jpg, .png)"
-        ]
-        
-        # Determine initial selection index
-        init_bg_idx = 0
-        if settings.background_type == "image_preset":
-            init_bg_idx = 1
-        elif settings.background_type == "image_url":
-            init_bg_idx = 2
-        elif settings.background_type == "image_upload":
-            init_bg_idx = 3
-
-        selected_bg_mode = st.radio(
-            "Modalità Sfondo Applicazione:",
-            options=bg_mode_options,
-            index=init_bg_idx
-        )
-
-        bg_type_selected = "default"
-        bg_preset_selected = settings.background_preset_key
-        bg_url_selected = settings.background_image_url
-        bg_base64_selected = settings.background_image_base64
-
-        if selected_bg_mode == "Wallpaper Finanziari ad Alta Definizione (Preset)":
-            bg_type_selected = "image_preset"
-            preset_img_keys = list(PRESET_BACKGROUND_IMAGES.keys())
-            curr_p_idx = preset_img_keys.index(settings.background_preset_key) if settings.background_preset_key in preset_img_keys else 1
-            bg_preset_selected = st.selectbox("Scegli Wallpaper Istituzionale:", preset_img_keys, index=curr_p_idx)
-            
-            chosen_url = PRESET_BACKGROUND_IMAGES[bg_preset_selected]
-            if chosen_url:
-                st.image(chosen_url, caption=f"Anteprima: {bg_preset_selected}", use_container_width=True)
-
-        elif selected_bg_mode == "URL Immagine Esterna Web":
-            bg_type_selected = "image_url"
-            bg_url_selected = st.text_input(
-                "Inserisci URL pubblico dell'immagine (.jpg, .png):",
-                value=settings.background_image_url,
-                placeholder="https://images.unsplash.com/photo-..."
-            )
-            if bg_url_selected.strip():
-                try:
-                    st.image(bg_url_selected.strip(), caption="Anteprima Immagine da URL", use_container_width=True)
-                except Exception:
-                    st.caption("Inserisci un link diretto valido a un'immagine web.")
-
-        elif selected_bg_mode == "Carica File Immagine dal Tuo Computer (.jpg, .png)":
-            bg_type_selected = "image_upload"
-            uploaded_bg = st.file_uploader("Seleziona file immagine da impostare come sfondo:", type=["png", "jpg", "jpeg", "webp"])
-            if uploaded_bg is not None:
-                img_bytes = uploaded_bg.read()
-                mime = uploaded_bg.type or "image/jpeg"
-                bg_base64_selected = f"data:{mime};base64,{base64.b64encode(img_bytes).decode('utf-8')}"
-                st.image(img_bytes, caption="Immagine caricata per lo sfondo", use_container_width=True)
-            elif settings.background_image_base64:
-                st.caption("Immagine caricata in precedenza già memorizzata.")
-        else:
-            bg_type_selected = "default"
-
-        overlay_op = st.slider(
-            "Opacità Velo di Copertura Sfondo (% scurezza per massima leggibilità testi):",
-            min_value=10, max_value=98, value=int(settings.background_overlay_opacity * 100), step=2
-        )
-
-        st.markdown("---")
-        # 3. REGOLAZIONE TRASPARENZE E EFFETTO GLASSMORPHISM
-        st.markdown("#### 🪟 3. Regolazione Trasparenze & Effetto Vetro Satinato (Glassmorphism)")
-        st.caption("Modifica l'opacità e la sfocatura delle finestre e delle card per far trasparire lo sfondo.")
-
-        col_t1, col_t2, col_t3 = st.columns(3)
-        with col_t1:
-            card_op = st.slider("Opacità Finestre e Card (%)", min_value=20, max_value=100, value=int(settings.card_opacity_pct), step=5)
-        with col_t2:
-            blur_px = st.slider("Intensità Sfocatura Vetro (Blur in px)", min_value=0, max_value=30, value=int(settings.card_blur_px), step=2)
-        with col_t3:
-            side_op = st.slider("Opacità Barra Laterale Sidebar (%)", min_value=40, max_value=100, value=int(settings.sidebar_opacity_pct), step=5)
-
-        # Live Interactive Glass Preview
-        st.markdown("##### 🔍 Anteprima Effetto Trasparenza in Tempo Reale")
-        glass_preview_rgba = hex_to_rgba(card_start, opacity=card_op / 100.0)
-        st.markdown(f"""
-        <div style="background: {glass_preview_rgba}; backdrop-filter: blur({blur_px}px); -webkit-backdrop-filter: blur({blur_px}px); border: 1px solid rgba(255,255,255,0.3); border-radius: 12px; padding: 18px; margin: 10px 0; box-shadow: 0 8px 32px 0 rgba(0,0,0,0.18);">
-            <div style="font-weight: 700; font-size: 16px; margin-bottom: 6px;">✨ Finestra Glassmorphism con Trasparenza al {card_op}% e Blur {blur_px}px</div>
-            <div style="font-size: 13px; opacity: 0.9;">I dati, i grafici e le tabelle di LUCAINVESTRATTO saranno visualizzati con questo stile di trasparenza e sfumatura degradante.</div>
-            <div style="margin-top: 12px;">
-                <button style="background: linear-gradient(135deg, {btn_start} 0%, {btn_end} 100%); color: #FFF; border: none; border-radius: 6px; padding: 6px 14px; font-weight: 600; font-size: 12px;">Pulsante Degradante Attivo</button>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown("---")
-        use_custom = st.checkbox("Abilita colori primari e accento personalizzati", value=settings.use_custom_colors)
-        c_cp1, c_cp2 = st.columns(2)
-        with c_cp1:
-            custom_p = st.color_picker("Colore Primario Base", value=settings.custom_primary_color)
-        with c_cp2:
-            custom_a = st.color_picker("Colore Accento Base", value=settings.custom_accent_color)
-
-        if st.button("💾 Salva e Applica Configurazione Completa", type="primary"):
-            settings.theme_preset = chosen_preset
-            settings.use_custom_colors = use_custom
-            settings.custom_primary_color = custom_p
-            settings.custom_accent_color = custom_a
-            
-            # Gradients
-            settings.gradient_buttons_enabled = grad_btn_en
-            settings.gradient_btn_start = btn_start
-            settings.gradient_btn_end = btn_end
-            settings.gradient_cards_enabled = grad_card_en
-            settings.gradient_card_start = card_start
-            settings.gradient_card_end = card_end
-
-            # Background
-            settings.background_type = bg_type_selected
-            settings.background_preset_key = bg_preset_selected
-            settings.background_image_url = bg_url_selected
-            settings.background_image_base64 = bg_base64_selected
-            settings.background_overlay_opacity = overlay_op / 100.0
-
-            # Transparency
-            settings.card_opacity_pct = float(card_op)
-            settings.card_blur_px = int(blur_px)
-            settings.sidebar_opacity_pct = float(side_op)
-
-            save_settings(settings)
-            st.success("Tutte le impostazioni di colore, sfumature, sfondo e trasparenza sono state salvate con successo!")
-            st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
 
     # ================= TAB 2: NOTIFICHE E ALERT PERSONALIZZATI =================
     with tab2:
