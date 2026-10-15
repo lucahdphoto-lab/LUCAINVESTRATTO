@@ -186,6 +186,33 @@ class Database:
                 cursor.execute("DELETE FROM transactions")
             conn.commit()
 
+    def clear_transactions_by_date(self, before_date: Optional[str] = None, after_date: Optional[str] = None, account_id: Optional[str] = None) -> int:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            query = "DELETE FROM transactions WHERE 1=1"
+            params: list = []
+            if account_id and account_id != "all":
+                query += " AND account_id = ?"
+                params.append(account_id)
+            if before_date:
+                query += " AND date <= ?"
+                params.append(before_date)
+            if after_date:
+                query += " AND date >= ?"
+                params.append(after_date)
+            cursor.execute(query, params)
+            deleted = cursor.rowcount
+            conn.commit()
+            return deleted
+
+    def factory_reset(self) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM holdings")
+            cursor.execute("DELETE FROM transactions")
+            cursor.execute("DELETE FROM accounts")
+            conn.commit()
+
     # ================= HOLDINGS =================
     def get_holdings(self, account_id: Optional[str] = None) -> List[Holding]:
         with self._get_connection() as conn:

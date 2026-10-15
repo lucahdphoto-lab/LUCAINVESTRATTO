@@ -5,6 +5,9 @@ Comprehensive automated tests for LUCAINVESTRATTO:
 - Text parser (.txt)
 - Image parser (.png / .jpg)
 - Report generators (.pdf, .xlsx, .txt)
+- Settings & color management
+- Notifications & threshold alerts
+- Selective reset & data alignment recalculation
 """
 import io
 import os
@@ -16,6 +19,9 @@ import pandas as pd
 from lucainvestratto.db import db
 from lucainvestratto.parsers import parse_statement_file
 from lucainvestratto.export import generate_pdf_report, generate_excel_report, generate_txt_report
+from lucainvestratto.settings import load_settings, save_settings, AppSettings, THEME_PRESETS
+from lucainvestratto.analytics.notifications import evaluate_alerts
+from lucainvestratto.analytics.recalc import run_data_audit, execute_recalculation_and_alignment
 
 
 class TestLucaInvestratto(unittest.TestCase):
@@ -84,7 +90,6 @@ ESTRATTO CONTO BANCARIO MENSILE
         self.assertEqual(res.transactions[1].amount, -115.20)
 
     def test_image_parser(self):
-        # Create a small valid test PNG image
         img = Image.new("RGB", (200, 100), color=(255, 255, 255))
         buf = io.BytesIO()
         img.save(buf, format="PNG")
@@ -104,6 +109,44 @@ ESTRATTO CONTO BANCARIO MENSILE
         txt_str = generate_txt_report(self.accounts, self.holdings, self.transactions)
         self.assertIn("LUCAINVESTRATTO", txt_str)
         self.assertIn("Indice di Sharpe", txt_str)
+
+    def test_settings_and_colors(self):
+        settings = load_settings()
+        self.assertIn(settings.theme_preset, THEME_PRESETS)
+        colors = settings.get_active_colors()
+        self.assertIn("primary_color", colors)
+        self.assertIn("header_bg_start", colors)
+
+        # Test custom modification
+        settings.theme_preset = "bloomberg_terminal"
+        settings.custom_primary_color = "#FF9900"
+        save_settings(settings)
+        reloaded = load_settings()
+        self.assertEqual(reloaded.theme_preset, "bloomberg_terminal")
+
+    def test_notifications_alerts(self):
+        settings = AppSettings(
+            alert_min_cash_amount=100000.0,  # Set high to force alert
+            alert_max_weight_pct=10.0        # Set low to force alert
+        )
+        alerts = evaluate_alerts(settings, self.accounts, self.holdings, self.transactions)
+        self.assertGreater(len(alerts), 0)
+
+    def test_data_audit_and_recalc(self):
+        audit = run_data_audit()
+        self.assertEqual(audit.total_accounts, 4)
+        self.assertGreater(audit.total_transactions, 0)
+        self.assertGreater(audit.total_holdings, 0)
+
+        res = execute_recalculation_and_alignment()
+        self.assertTrue(res["success"])
+
+    def test_selective_clear(self):
+        # Clear transactions before date
+        initial_count = len(db.get_transactions())
+        deleted = db.clear_transactions_by_date(before_date="2024-01-01")
+        remaining = len(db.get_transactions())
+        self.assertEqual(initial_count - deleted, remaining)
 
 
 if __name__ == "__main__":

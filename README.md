@@ -67,6 +67,23 @@ Implementazione rigorosa di tutti gli indicatori quantitativi utilizzati dai sof
 
 ---
 
+### 7. ⚙️ Impostazioni, Colori, Alert & Allineamento Dati
+- **🎨 Modifica e Scelta Colori**:
+  - Selezione tra preset istituzionali (*FactSet Dark Navy*, *Bloomberg Amber & Black*, *Private Wealth Emerald*, *Cyber Violet*, *Classic Slate*).
+  - Color pickers manuali per impostare colori primari e di accento personalizzati.
+- **🔔 Notifiche & Alert Personalizzati**:
+  - Regole e soglie configurabili per *Massimo Drawdown*, *Giacenza di Liquidità Minima*, *Sovra-allocazione / Concentrazione Singolo Titolo* e *Uscite / Spese Rilevanti*.
+  - Centro notifiche attive in tempo reale con badge dinamico nell'intestazione.
+- **🧹 Azzeramento Selettivo**:
+  - Pulizia mirata di sole transazioni (con eventuale filtro per conto o per data).
+  - Pulizia mirata delle sole posizioni di portafoglio.
+  - Ripristino totale di fabbrica (*Factory Reset*) protetto da conferma esplicita.
+- **🔄 Ricalcolo & Allineamento Dati**:
+  - Rapporto diagnostico con verifica di integrità: record orfani, transazioni duplicate, sbilanciamenti nei giroconti.
+  - Ricalcolo automatico e sincronizzazione di saldi progressivi, quote e controvalori.
+
+---
+
 ## 🏗️ Architettura del Software
 
 ```
@@ -75,15 +92,19 @@ proud-bardeen/
 ├── requirements.txt               # Dipendenze Python
 ├── run.sh                         # Script bash di avvio automatico
 ├── data/
-│   └── lucainvestratto.db         # Database SQLite persistente
+│   ├── lucainvestratto.db         # Database SQLite persistente
+│   └── settings.json              # Configurazione salvata di temi e notifiche
 ├── lucainvestratto/
 │   ├── config.py                  # Costanti, valute, benchmark istituzionali
 │   ├── db.py                      # Engine SQLite, repository CRUD e demo data loader
 │   ├── models.py                  # Dataclass: BankAccount, Transaction, Holding, RiskMetrics
+│   ├── settings.py                # Gestore preferenze utente, palette e soglie alert
 │   ├── analytics/                 # Motori di calcolo quantitativo
 │   │   ├── cashflow.py            # Analisi flussi, saldi giornalieri e categorie
 │   │   ├── assets.py              # Asset allocation, pesi, PMC e P&L
-│   │   └── risk.py                # Sharpe, Sortino, VaR, MDD, Beta, Alpha, Underwater
+│   │   ├── risk.py                # Sharpe, Sortino, VaR, MDD, Beta, Alpha, Underwater
+│   │   ├── notifications.py       # Motore di valutazione alert in tempo reale
+│   │   └── recalc.py              # Diagnostica integrità, allineamento saldi e deduplicazione
 │   ├── parsers/                   # Parser multi-formato
 │   │   ├── base.py                # Utility di pulizia valute e date
 │   │   ├── csv_parser.py          # Parser CSV auto-delimiter
@@ -95,14 +116,15 @@ proud-bardeen/
 │   │   ├── excel_report.py        # Generatore cartelle OpenPyXL
 │   │   └── txt_report.py          # Generatore report ASCII
 │   └── ui/                        # Interfaccia grafica Streamlit
-│       ├── theme.py               # Tema scuro/chiaro FactSet, badge e card KPI
+│       ├── theme.py               # Tema scuro/chiaro FactSet, badge e card KPI dinamiche
 │       └── views/                 # Maschere di analisi modulari
 │           ├── accounts_view.py   # Gestione multi-conto
 │           ├── import_view.py     # Importazione file e input manuale
 │           ├── cashflow_view.py   # Estratto conto per data
 │           ├── asset_view.py      # Analisi per asset
 │           ├── investment_view.py # Analisi investimento FactSet
-│           └── export_view.py     # Download report .pdf, .xlsx, .txt
+│           ├── export_view.py     # Download report .pdf, .xlsx, .txt
+│           └── settings_view.py   # Impostazioni colori, alert, azzeramenti e ricalcolo
 └── tests/
     └── test_parsers.py            # Suite di test unitari automatizzati
 ```

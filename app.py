@@ -2,7 +2,8 @@
 Main application entry point for LUCAINVESTRATTO.
 Multi-bank account management, multi-format statement import (.xlsx, .csv, .txt, .png, .jpg),
 date-based cash flow analysis, asset allocation, institutional investment analytics (FactSet/Investing standards),
-and automated multi-format report exports (.pdf, .xlsx, .txt).
+automated multi-format report exports (.pdf, .xlsx, .txt), and comprehensive settings with custom colors,
+notifications, selective resets, and data alignment.
 """
 import sys
 import os
@@ -16,17 +17,20 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from lucainvestratto.db import db
+from lucainvestratto.settings import load_settings
 from lucainvestratto.ui.theme import apply_theme, render_brand_header, render_metric_card
 from lucainvestratto.analytics.cashflow import calculate_cashflow_summary
 from lucainvestratto.analytics.assets import calculate_asset_summary
 from lucainvestratto.analytics.risk import calculate_risk_metrics
+from lucainvestratto.analytics.notifications import evaluate_alerts
 from lucainvestratto.ui.views import (
     render_accounts_view,
     render_import_view,
     render_cashflow_view,
     render_asset_view,
     render_investment_view,
-    render_export_view
+    render_export_view,
+    render_settings_view
 )
 
 # Page Configuration
@@ -37,8 +41,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Apply Modern Financial Theme
-apply_theme()
+# Load settings and apply dynamic visual theme
+app_settings = load_settings()
+active_colors = app_settings.get_active_colors()
+apply_theme(active_colors)
 
 # Ensure sample demo data is loaded if database is empty on first boot
 db.load_demo_data(reset=False)
@@ -79,8 +85,13 @@ with st.sidebar:
     st.markdown("---")
     st.markdown(f"**Liquidità Disponibile:**<br>`€ {tot_cash:,.2f}`", unsafe_allow_html=True)
     st.markdown(f"**Portafoglio Investito:**<br>`€ {tot_invest:,.2f}`", unsafe_allow_html=True)
-    st.markdown(f"**Patrimonio Netto:**<br><span style='color: #2563EB; font-size: 1.15em; font-weight: bold;'>€ {net_worth:,.2f}</span>", unsafe_allow_html=True)
+    st.markdown(f"**Patrimonio Netto:**<br><span style='color: {active_colors['primary_color']}; font-size: 1.15em; font-weight: bold;'>€ {net_worth:,.2f}</span>", unsafe_allow_html=True)
     st.markdown("---")
+
+    # Evaluate Active Notifications
+    active_alerts = evaluate_alerts(app_settings, accounts, active_holdings, active_txs)
+    if active_alerts:
+        st.warning(f"⚠️ **{len(active_alerts)} Alert Rilevati**")
 
     # Main Navigation
     st.markdown("### 🧭 **Menu Navigazione**")
@@ -93,7 +104,8 @@ with st.sidebar:
             "📈 Analisi Investimento (FactSet)",
             "📥 Import Dati (.xlsx, .csv, .txt, .img)",
             "🏦 Gestione Conti Bancari",
-            "📑 Esportazione Report (.pdf, .xlsx, .txt)"
+            "📑 Esportazione Report (.pdf, .xlsx, .txt)",
+            "⚙️ Impostazioni & Alert"
         ],
         index=0
     )
@@ -103,7 +115,22 @@ with st.sidebar:
 
 
 # ================= MAIN VIEW ROUTING =================
-render_brand_header(active_account_name=selected_account_name)
+render_brand_header(active_account_name=selected_account_name, active_alerts_count=len(active_alerts))
+
+# If there are active alerts and on Dashboard, render a quick notification banner
+if active_alerts and nav_choice == "📊 Dashboard Consolidata":
+    with st.expander(f"⚠️ **Attenzione: {len(active_alerts)} soglie di allerta superate** (Clicca per visualizzare i dettagli)", expanded=True):
+        for alert in active_alerts:
+            box_class = f"notif-{alert.level}"
+            st.markdown(f"""
+            <div class="notif-box {box_class}">
+                <span style="font-size: 20px;">{alert.icon}</span>
+                <div>
+                    <b>{alert.title}</b>: {alert.message}
+                    <br><small>Rilevato: <b>{alert.current_value}</b> (Soglia limite: {alert.threshold_value})</small>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
 if nav_choice == "📊 Dashboard Consolidata":
     # Executive Overview Dashboard
@@ -135,7 +162,6 @@ if nav_choice == "📊 Dashboard Consolidata":
 
     with col_chart_l:
         st.markdown("#### 🎯 Ripartizione Patrimonio & Asset Allocation")
-        # Build allocation including liquid cash and investment classes
         alloc_items = []
         if tot_cash > 0:
             alloc_items.append({"Classe": "Liquidità & Conti Correnti", "Valore": tot_cash})
@@ -167,9 +193,9 @@ if nav_choice == "📊 Dashboard Consolidata":
                 y=df_daily["balance"],
                 mode="lines",
                 name="Saldo Cassa",
-                line=dict(color="#2563EB", width=2.5),
+                line=dict(color=active_colors["primary_color"], width=2.5),
                 fill="tozeroy",
-                fillcolor="rgba(37, 99, 235, 0.10)"
+                fillcolor=f"rgba(37, 99, 235, 0.10)"
             ))
             fig_dash_bal.update_layout(
                 margin=dict(l=10, r=10, t=10, b=10),
@@ -220,3 +246,6 @@ elif nav_choice == "🏦 Gestione Conti Bancari":
 
 elif nav_choice == "📑 Esportazione Report (.pdf, .xlsx, .txt)":
     render_export_view(selected_account_id=selected_account_id, selected_account_name=selected_account_name)
+
+elif nav_choice == "⚙️ Impostazioni & Alert":
+    render_settings_view()

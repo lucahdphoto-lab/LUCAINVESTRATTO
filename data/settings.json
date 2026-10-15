@@ -1,0 +1,14 @@
+{
+  "theme_preset": "bloomberg_terminal",
+  "custom_primary_color": "#FF9900",
+  "custom_accent_color": "#38BDF8",
+  "use_custom_colors": false,
+  "alert_max_drawdown_enabled": true,
+  "alert_max_drawdown_pct": 8.0,
+  "alert_min_cash_enabled": true,
+  "alert_min_cash_amount": 5000.0,
+  "alert_max_weight_enabled": true,
+  "alert_max_weight_pct": 25.0,
+  "alert_high_expense_enabled": true,
+  "alert_high_expense_amount": 1200.0
+}
