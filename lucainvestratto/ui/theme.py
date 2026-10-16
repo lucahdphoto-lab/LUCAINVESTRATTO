@@ -70,11 +70,31 @@ def apply_theme(settings: Optional[AppSettings] = None):
 
         {bg_css}
 
-        /* Sidebar Glassmorphism */
+        /* Sidebar Glassmorphism & Fixed Responsive Width */
         section[data-testid="stSidebar"] {{
             background: rgba(15, 23, 42, {sidebar_opacity:.2f}) !important;
             backdrop-filter: blur({card_blur}px) !important;
             -webkit-backdrop-filter: blur({card_blur}px) !important;
+            width: 290px !important;
+            min-width: 260px !important;
+            max-width: 300px !important;
+        }}
+
+        /* On mobile, guarantee the sidebar leaves space and never covers 100% of the screen */
+        @media (max-width: 768px) {{
+            section[data-testid="stSidebar"] {{
+                width: 82vw !important;
+                max-width: 310px !important;
+                box-shadow: 12px 0 35px rgba(0, 0, 0, 0.75) !important;
+            }}
+            /* Make sidebar collapse toggle clearly visible and touch-friendly */
+            button[data-testid="stSidebarCollapseButton"] {{
+                background: rgba(37, 99, 235, 0.3) !important;
+                border: 1px solid rgba(56, 189, 248, 0.5) !important;
+                border-radius: 8px !important;
+                color: #38BDF8 !important;
+                padding: 6px !important;
+            }}
         }}
 
         /* Dynamic Header Brand */

@@ -39,7 +39,7 @@ st.set_page_config(
     page_title="LUCAINVESTRATTO - Wealth & Statement Analytics",
     page_icon="🏛️",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="auto"
 )
 
 # Load settings and apply dynamic visual theme
@@ -172,6 +172,45 @@ with st.sidebar:
 
 # ================= MAIN VIEW ROUTING =================
 render_brand_header(active_account_name=selected_account_name, active_alerts_count=len(active_alerts))
+
+# Quick Top Navigation Pills (particolarmente comodi da Smartphone per non dover aprire la sidebar)
+nav_keys = [
+    "📊 Dashboard Consolidata",
+    "💼 Analisi per Asset",
+    "📈 Analisi Investimento (FactSet)",
+    "📅 Estratto Conto per Data",
+    "📸 Snapshot & Quadratura Mensile",
+    "📥 Import Dati (.xlsx, .csv, .txt, .img)",
+    "🏦 Gestione Conti Bancari",
+    "📑 Esportazione Report (.pdf, .xlsx, .txt)",
+    "⚙️ Impostazioni & Alert"
+]
+
+nav_short_labels = {
+    "📊 Dashboard Consolidata": "📊 Dashboard",
+    "💼 Analisi per Asset": "💼 Portafoglio",
+    "📈 Analisi Investimento (FactSet)": "📈 FactSet",
+    "📅 Estratto Conto per Data": "📅 Estratto Conto",
+    "📸 Snapshot & Quadratura Mensile": "📸 Snapshot",
+    "📥 Import Dati (.xlsx, .csv, .txt, .img)": "📥 Import Dati",
+    "🏦 Gestione Conti Bancari": "🏦 Conti",
+    "📑 Esportazione Report (.pdf, .xlsx, .txt)": "📑 Report",
+    "⚙️ Impostazioni & Alert": "⚙️ Impostazioni"
+}
+
+selected_pill = st.pills(
+    "Navigazione Rapida:",
+    options=nav_keys,
+    default=st.session_state["nav_choice"],
+    format_func=lambda k: nav_short_labels.get(k, k),
+    label_visibility="collapsed",
+    key="top_nav_pills"
+)
+if selected_pill and selected_pill != st.session_state["nav_choice"]:
+    st.session_state["nav_choice"] = selected_pill
+    st.rerun()
+
+nav_choice = st.session_state["nav_choice"]
 
 # If there are active alerts and on Dashboard, render a quick notification banner
 if active_alerts and nav_choice == "📊 Dashboard Consolidata":
