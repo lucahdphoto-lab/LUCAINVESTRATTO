@@ -489,15 +489,17 @@ def render_settings_view():
         if audit.account_balances:
             df_reconcile = pd.DataFrame(audit.account_balances)
             st.dataframe(
-                df_reconcile.style.format({
-                    "Saldo Iniziale": "€ {:,.2f}",
-                    "Flusso Transazioni": "€ {:+,.2f}",
-                    "Liquidità Effettiva": "€ {:,.2f}",
-                    "Portafoglio Investito": "€ {:,.2f}",
-                    "Patrimonio Totale": "€ {:,.2f}"
-                }),
+                df_reconcile,
+                column_config={
+                    "Saldo Iniziale": st.column_config.NumberColumn(format="€ %.2f"),
+                    "Flusso Transazioni": st.column_config.NumberColumn(format="€ %.2f"),
+                    "Liquidità Effettiva": st.column_config.NumberColumn(format="€ %.2f"),
+                    "Portafoglio Investito": st.column_config.NumberColumn(format="€ %.2f"),
+                    "Patrimonio Totale": st.column_config.NumberColumn(format="€ %.2f")
+                },
                 use_container_width=True
             )
+
 
         st.divider()
         st.markdown("##### 🚀 Esegui Azione di Allineamento e Ripulitura Automatica")

@@ -360,8 +360,17 @@ def render_snapshots_view():
                 st.plotly_chart(fig_alloc, use_container_width=True)
 
             # Table of Historical Snapshots
-            st.markdown("##### 📋 Registro Cronologico Snapshot")
-            st.dataframe(df_snaps, use_container_width=True)
+            st.dataframe(
+                df_snaps,
+                column_config={
+                    "Patrimonio Totale (€)": st.column_config.NumberColumn(format="€ %.2f"),
+                    "Liquidità (€)": st.column_config.NumberColumn(format="€ %.2f"),
+                    "Investito (€)": st.column_config.NumberColumn(format="€ %.2f"),
+                    "Variazione Mensile (€)": st.column_config.NumberColumn(format="€ %.2f"),
+                    "Variazione Mensile (%)": st.column_config.NumberColumn(format="%.2f %%"),
+                },
+                use_container_width=True
+            )
 
     # ==========================================
     # TAB 4: PHOTOGRAPHIC ARCHIVE GALLERY

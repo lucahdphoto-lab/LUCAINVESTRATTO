@@ -2,7 +2,8 @@
 Institutional Excel report generator for LUCAINVESTRATTO.
 Creates a professional multi-sheet formatted workbook (.xlsx) using OpenPyXL.
 Ensures ALL numeric data is strictly typed as numeric (float/int), NEVER as formatted text.
-Standard Excel number formats and active formulas are applied for maximum compatibility.
+Standard Excel number formats, active formulas, and explicit RIGHT ALIGNMENT are enforced
+on all numerical cells, guaranteeing seamless mathematical operations and institutional presentation.
 """
 import io
 from typing import List, Dict, Any, Optional
@@ -60,12 +61,20 @@ def generate_excel_report(
     total_border = Border(left=thin_side, right=thin_side, top=thick_top_side, bottom=double_bottom_side)
 
     # Standard Excel Number Formats
-    FMT_CURRENCY = '#,##0.00 €;[Red]-#,##0.00 €;0.00 €'
-    FMT_CURRENCY_PLAIN = '#,##0.00 €'
+    FMT_CURRENCY = '#,##0.00 "€";[Red]-#,##0.00 "€";0.00 "€"'
+    FMT_CURRENCY_PLAIN = '#,##0.00 "€"'
     FMT_PCT_SIGNED = '+0.00%;-0.00%;0.00%'
     FMT_PCT = '0.00%'
     FMT_QTY = '#,##0.0000'
     FMT_DECIMAL = '0.00'
+
+    # Explicit Alignments: Numbers MUST always be right-aligned!
+    align_left = Alignment(horizontal="left", vertical="center")
+    align_center = Alignment(horizontal="center", vertical="center")
+    align_right = Alignment(horizontal="right", vertical="center")
+    align_header_left = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    align_header_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    align_header_right = Alignment(horizontal="right", vertical="center", wrap_text=True)
 
     # Compute analytics
     cash_sum = calculate_cashflow_summary(transactions, accounts)
@@ -88,15 +97,19 @@ def generate_excel_report(
     ws1["A2"] = f"Generato il: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Perimetro: {account_filter_name} | Benchmark: {benchmark_code}"
     ws1["A2"].font = font_subtitle
 
-    # KPI Table
+    # KPI Table Headers
     ws1["A4"] = "INDICATORE PATRIMONIALE"
+    ws1["A4"].alignment = align_header_left
     ws1["B4"] = "VALORE (€)"
+    ws1["B4"].alignment = align_header_right
     ws1["D4"] = "METRICA DI RISCHIO FACTSET"
+    ws1["D4"].alignment = align_header_left
     ws1["E4"] = "VALORE"
+    ws1["E4"].alignment = align_header_right
+
     for col in ["A4", "B4", "D4", "E4"]:
         ws1[col].font = font_header
         ws1[col].fill = fill_header
-        ws1[col].alignment = Alignment(horizontal="center")
 
     kpi_left = [
         ("Patrimonio Netto Totale", patrimonio_totale, FMT_CURRENCY),
@@ -133,23 +146,27 @@ def generate_excel_report(
     for idx, (label, val, fmt) in enumerate(kpi_left, start=5):
         ws1[f"A{idx}"] = label
         ws1[f"A{idx}"].font = font_bold if idx == 5 else font_normal
+        ws1[f"A{idx}"].alignment = align_left
         ws1[f"A{idx}"].border = thin_border
         
         c = ws1[f"B{idx}"]
         c.value = _to_num(val)
         c.font = font_bold if idx == 5 else font_normal
         c.number_format = fmt
+        c.alignment = align_right  # Explicit Right Alignment for numbers
         c.border = thin_border
 
     for idx, (label, val, fmt) in enumerate(kpi_right, start=5):
         ws1[f"D{idx}"] = label
         ws1[f"D{idx}"].font = font_normal
+        ws1[f"D{idx}"].alignment = align_left
         ws1[f"D{idx}"].border = thin_border
         
         c = ws1[f"E{idx}"]
         c.value = _to_num(val)
         c.font = font_bold if idx in [5, 6, 7] else font_normal
         c.number_format = fmt
+        c.alignment = align_right  # Explicit Right Alignment for numbers
         c.border = thin_border
 
     # ================= SHEET 2: ASSET ALLOCATION =================
@@ -158,12 +175,19 @@ def generate_excel_report(
     ws2["A1"] = "RIPARTIZIONE PORTAFOGLIO PER ASSET CLASS"
     ws2["A1"].font = font_title
 
-    headers_alloc = ["Asset Class", "Controvalore (€)", "Costo Storico (€)", "Peso (%)", "P&L (€)", "Rendimento (%)"]
-    for col_idx, h in enumerate(headers_alloc, 1):
+    headers_alloc = [
+        ("Asset Class", align_header_left),
+        ("Controvalore (€)", align_header_right),
+        ("Costo Storico (€)", align_header_right),
+        ("Peso (%)", align_header_right),
+        ("P&L (€)", align_header_right),
+        ("Rendimento (%)", align_header_right)
+    ]
+    for col_idx, (h, aln) in enumerate(headers_alloc, 1):
         cell = ws2.cell(row=3, column=col_idx, value=h)
         cell.font = font_header
         cell.fill = fill_header
-        cell.alignment = Alignment(horizontal="center")
+        cell.alignment = aln
 
     df_class = asset_sum.get("df_by_class")
     start_row_alloc = 4
@@ -172,27 +196,34 @@ def generate_excel_report(
     if df_class is not None and not df_class.empty:
         for r in df_class.itertuples():
             row_idx = current_row_alloc
-            ws2.cell(row=row_idx, column=1, value=str(getattr(r, "asset_class", ""))).font = font_bold
+            c1 = ws2.cell(row=row_idx, column=1, value=str(getattr(r, "asset_class", "")))
+            c1.font = font_bold
+            c1.alignment = align_left
             
             c2 = ws2.cell(row=row_idx, column=2, value=_to_num(getattr(r, "market_value", 0.0)))
             c2.number_format = FMT_CURRENCY_PLAIN
             c2.font = font_normal
+            c2.alignment = align_right
 
             c3 = ws2.cell(row=row_idx, column=3, value=_to_num(getattr(r, "total_cost", 0.0)))
             c3.number_format = FMT_CURRENCY_PLAIN
             c3.font = font_normal
+            c3.alignment = align_right
 
             c4 = ws2.cell(row=row_idx, column=4, value=_to_num(getattr(r, "weight_pct", 0.0)) / 100.0)
             c4.number_format = FMT_PCT
             c4.font = font_normal
+            c4.alignment = align_right
 
             c5 = ws2.cell(row=row_idx, column=5, value=_to_num(getattr(r, "unrealized_pl", 0.0)))
             c5.number_format = FMT_CURRENCY
             c5.font = font_normal
+            c5.alignment = align_right
 
             c6 = ws2.cell(row=row_idx, column=6, value=_to_num(getattr(r, "pl_pct", 0.0)) / 100.0)
             c6.number_format = FMT_PCT_SIGNED
             c6.font = font_normal
+            c6.alignment = align_right
 
             for c in range(1, 7):
                 ws2.cell(row=row_idx, column=c).border = thin_border
@@ -202,27 +233,34 @@ def generate_excel_report(
 
         # Totals Row with active formulas
         tot_row = current_row_alloc
-        ws2.cell(row=tot_row, column=1, value="TOTALE PORTAFOGLIO").font = font_total
+        c_tot_label = ws2.cell(row=tot_row, column=1, value="TOTALE PORTAFOGLIO")
+        c_tot_label.font = font_total
+        c_tot_label.alignment = align_left
         
         tc2 = ws2.cell(row=tot_row, column=2, value=f"=SUM(B{start_row_alloc}:B{tot_row - 1})")
         tc2.number_format = FMT_CURRENCY_PLAIN
         tc2.font = font_total
+        tc2.alignment = align_right
 
         tc3 = ws2.cell(row=tot_row, column=3, value=f"=SUM(C{start_row_alloc}:C{tot_row - 1})")
         tc3.number_format = FMT_CURRENCY_PLAIN
         tc3.font = font_total
+        tc3.alignment = align_right
 
         tc4 = ws2.cell(row=tot_row, column=4, value=f"=SUM(D{start_row_alloc}:D{tot_row - 1})")
         tc4.number_format = FMT_PCT
         tc4.font = font_total
+        tc4.alignment = align_right
 
         tc5 = ws2.cell(row=tot_row, column=5, value=f"=SUM(E{start_row_alloc}:E{tot_row - 1})")
         tc5.number_format = FMT_CURRENCY
         tc5.font = font_total
+        tc5.alignment = align_right
 
         tc6 = ws2.cell(row=tot_row, column=6, value=f"=IF(C{tot_row}>0, (B{tot_row}-C{tot_row})/C{tot_row}, 0)")
         tc6.number_format = FMT_PCT_SIGNED
         tc6.font = font_total
+        tc6.alignment = align_right
 
         for c in range(1, 7):
             ws2.cell(row=tot_row, column=c).border = total_border
@@ -235,16 +273,28 @@ def generate_excel_report(
     ws3["A1"].font = font_title
 
     headers_pos = [
-        "Simbolo / ISIN", "Nome Strumento", "Asset Class", "Settore", "Geografia", "Valuta",
-        "Quantità", "PMC (€)", "Prezzo Attuale (€)", "Costo Totale (€)",
-        "Controvalore (€)", "P&L (€)", "Rendimento (%)", "Peso (%)",
-        "Yield Dividendo (%)", "Reddito Annuo Stimato (€)"
+        ("Simbolo / ISIN", align_header_center),
+        ("Nome Strumento", align_header_left),
+        ("Asset Class", align_header_left),
+        ("Settore", align_header_left),
+        ("Geografia", align_header_center),
+        ("Valuta", align_header_center),
+        ("Quantità", align_header_right),
+        ("PMC (€)", align_header_right),
+        ("Prezzo Attuale (€)", align_header_right),
+        ("Costo Totale (€)", align_header_right),
+        ("Controvalore (€)", align_header_right),
+        ("P&L (€)", align_header_right),
+        ("Rendimento (%)", align_header_right),
+        ("Peso (%)", align_header_right),
+        ("Yield Dividendo (%)", align_header_right),
+        ("Reddito Annuo Stimato (€)", align_header_right)
     ]
-    for col_idx, h in enumerate(headers_pos, 1):
+    for col_idx, (h, aln) in enumerate(headers_pos, 1):
         cell = ws3.cell(row=3, column=col_idx, value=h)
         cell.font = font_header
         cell.fill = fill_header
-        cell.alignment = Alignment(horizontal="center")
+        cell.alignment = aln
 
     df_holdings = asset_sum.get("df_holdings")
     start_row_h = 4
@@ -253,53 +303,81 @@ def generate_excel_report(
     if df_holdings is not None and not df_holdings.empty:
         for h in df_holdings.itertuples():
             row_idx = current_row_h
-            ws3.cell(row=row_idx, column=1, value=str(getattr(h, "symbol", ""))).font = font_bold
-            ws3.cell(row=row_idx, column=2, value=str(getattr(h, "name", ""))).font = font_normal
-            ws3.cell(row=row_idx, column=3, value=str(getattr(h, "asset_class", ""))).font = font_normal
-            ws3.cell(row=row_idx, column=4, value=str(getattr(h, "sector", ""))).font = font_normal
-            ws3.cell(row=row_idx, column=5, value=str(getattr(h, "geography", ""))).font = font_normal
-            ws3.cell(row=row_idx, column=6, value=str(getattr(h, "currency", "EUR"))).font = font_normal
+            
+            c_sym = ws3.cell(row=row_idx, column=1, value=str(getattr(h, "symbol", "")))
+            c_sym.font = font_bold
+            c_sym.alignment = align_center
 
-            # Strictly numeric columns
+            c_name = ws3.cell(row=row_idx, column=2, value=str(getattr(h, "name", "")))
+            c_name.font = font_normal
+            c_name.alignment = align_left
+
+            c_cls = ws3.cell(row=row_idx, column=3, value=str(getattr(h, "asset_class", "")))
+            c_cls.font = font_normal
+            c_cls.alignment = align_left
+
+            c_sec = ws3.cell(row=row_idx, column=4, value=str(getattr(h, "sector", "")))
+            c_sec.font = font_normal
+            c_sec.alignment = align_left
+
+            c_geo = ws3.cell(row=row_idx, column=5, value=str(getattr(h, "geography", "")))
+            c_geo.font = font_normal
+            c_geo.alignment = align_center
+
+            c_cur = ws3.cell(row=row_idx, column=6, value=str(getattr(h, "currency", "EUR")))
+            c_cur.font = font_normal
+            c_cur.alignment = align_center
+
+            # Numeric columns with strictly RIGHT alignment
             c_qty = ws3.cell(row=row_idx, column=7, value=_to_num(getattr(h, "quantity", 0.0)))
             c_qty.number_format = FMT_QTY
             c_qty.font = font_normal
+            c_qty.alignment = align_right
 
             c_pmc = ws3.cell(row=row_idx, column=8, value=_to_num(getattr(h, "average_buy_price", 0.0)))
             c_pmc.number_format = FMT_CURRENCY_PLAIN
             c_pmc.font = font_normal
+            c_pmc.alignment = align_right
 
             c_px = ws3.cell(row=row_idx, column=9, value=_to_num(getattr(h, "current_price", 0.0)))
             c_px.number_format = FMT_CURRENCY_PLAIN
             c_px.font = font_normal
+            c_px.alignment = align_right
 
             c_cost = ws3.cell(row=row_idx, column=10, value=_to_num(getattr(h, "total_cost", 0.0)))
             c_cost.number_format = FMT_CURRENCY_PLAIN
             c_cost.font = font_normal
+            c_cost.alignment = align_right
 
             c_mv = ws3.cell(row=row_idx, column=11, value=_to_num(getattr(h, "market_value", 0.0)))
             c_mv.number_format = FMT_CURRENCY_PLAIN
             c_mv.font = font_normal
+            c_mv.alignment = align_right
 
             c_pl = ws3.cell(row=row_idx, column=12, value=_to_num(getattr(h, "unrealized_pl", 0.0)))
             c_pl.number_format = FMT_CURRENCY
             c_pl.font = font_normal
+            c_pl.alignment = align_right
 
             c_pl_pct = ws3.cell(row=row_idx, column=13, value=_to_num(getattr(h, "unrealized_pl_pct", 0.0)) / 100.0)
             c_pl_pct.number_format = FMT_PCT_SIGNED
             c_pl_pct.font = font_normal
+            c_pl_pct.alignment = align_right
 
             c_w = ws3.cell(row=row_idx, column=14, value=_to_num(getattr(h, "weight_pct", 0.0)) / 100.0)
             c_w.number_format = FMT_PCT
             c_w.font = font_normal
+            c_w.alignment = align_right
 
             c_yd = ws3.cell(row=row_idx, column=15, value=_to_num(getattr(h, "annual_dividend_yield", 0.0)) / 100.0)
             c_yd.number_format = FMT_PCT
             c_yd.font = font_normal
+            c_yd.alignment = align_right
 
             c_inc = ws3.cell(row=row_idx, column=16, value=_to_num(getattr(h, "expected_annual_income", 0.0)))
             c_inc.number_format = FMT_CURRENCY_PLAIN
             c_inc.font = font_normal
+            c_inc.alignment = align_right
 
             for c in range(1, 17):
                 ws3.cell(row=row_idx, column=c).border = thin_border
@@ -309,7 +387,9 @@ def generate_excel_report(
 
         # Totals Row with active formulas
         tot_h_row = current_row_h
-        ws3.cell(row=tot_h_row, column=1, value="TOTALE GENERALE").font = font_total
+        c_tot_h_lbl = ws3.cell(row=tot_h_row, column=1, value="TOTALE GENERALE")
+        c_tot_h_lbl.font = font_total
+        c_tot_h_lbl.alignment = align_left
 
         for c_empty in range(2, 10):
             ws3.cell(row=tot_h_row, column=c_empty, value="")
@@ -317,28 +397,34 @@ def generate_excel_report(
         t_cost = ws3.cell(row=tot_h_row, column=10, value=f"=SUM(J{start_row_h}:J{tot_h_row - 1})")
         t_cost.number_format = FMT_CURRENCY_PLAIN
         t_cost.font = font_total
+        t_cost.alignment = align_right
 
         t_mv = ws3.cell(row=tot_h_row, column=11, value=f"=SUM(K{start_row_h}:K{tot_h_row - 1})")
         t_mv.number_format = FMT_CURRENCY_PLAIN
         t_mv.font = font_total
+        t_mv.alignment = align_right
 
         t_pl = ws3.cell(row=tot_h_row, column=12, value=f"=SUM(L{start_row_h}:L{tot_h_row - 1})")
         t_pl.number_format = FMT_CURRENCY
         t_pl.font = font_total
+        t_pl.alignment = align_right
 
         t_pl_pct = ws3.cell(row=tot_h_row, column=13, value=f"=IF(J{tot_h_row}>0, L{tot_h_row}/J{tot_h_row}, 0)")
         t_pl_pct.number_format = FMT_PCT_SIGNED
         t_pl_pct.font = font_total
+        t_pl_pct.alignment = align_right
 
         t_w = ws3.cell(row=tot_h_row, column=14, value=f"=SUM(N{start_row_h}:N{tot_h_row - 1})")
         t_w.number_format = FMT_PCT
         t_w.font = font_total
+        t_w.alignment = align_right
 
         ws3.cell(row=tot_h_row, column=15, value="")
 
         t_inc = ws3.cell(row=tot_h_row, column=16, value=f"=SUM(P{start_row_h}:P{tot_h_row - 1})")
         t_inc.number_format = FMT_CURRENCY_PLAIN
         t_inc.font = font_total
+        t_inc.alignment = align_right
 
         for c in range(1, 17):
             ws3.cell(row=tot_h_row, column=c).border = total_border
@@ -351,55 +437,95 @@ def generate_excel_report(
     ws4["A1"].font = font_title
 
     headers_tx = [
-        "Data", "ID Transazione", "ID Conto", "Nome Conto", "Tipo Operazione",
-        "Categoria", "Importo (€)", "Commissioni (€)", "Valuta",
-        "Descrizione / Causale", "Titolo / Ticker", "Quantità", "Prezzo Unitario (€)"
+        ("Data", align_header_center),
+        ("ID Transazione", align_header_center),
+        ("ID Conto", align_header_center),
+        ("Nome Conto", align_header_left),
+        ("Tipo Operazione", align_header_left),
+        ("Categoria", align_header_left),
+        ("Importo (€)", align_header_right),
+        ("Commissioni (€)", align_header_right),
+        ("Valuta", align_header_center),
+        ("Descrizione / Causale", align_header_left),
+        ("Titolo / Ticker", align_header_center),
+        ("Quantità", align_header_right),
+        ("Prezzo Unitario (€)", align_header_right)
     ]
-    for col_idx, h in enumerate(headers_tx, 1):
+    for col_idx, (h, aln) in enumerate(headers_tx, 1):
         cell = ws4.cell(row=3, column=col_idx, value=h)
         cell.font = font_header
         cell.fill = fill_header
-        cell.alignment = Alignment(horizontal="center")
+        cell.alignment = aln
 
     start_row_tx = 4
     current_row_tx = start_row_tx
 
     for tx in transactions:
         row_idx = current_row_tx
-        ws4.cell(row=row_idx, column=1, value=str(tx.date or "")).font = font_normal
-        ws4.cell(row=row_idx, column=2, value=str(tx.id or "")).font = font_normal
-        ws4.cell(row=row_idx, column=3, value=str(tx.account_id or "")).font = font_normal
-        ws4.cell(row=row_idx, column=4, value=acc_map.get(tx.account_id, str(tx.account_id or ""))).font = font_normal
-        ws4.cell(row=row_idx, column=5, value=str(tx.type or "")).font = font_normal
-        ws4.cell(row=row_idx, column=6, value=str(tx.category or "Altro")).font = font_normal
+        
+        c_dt = ws4.cell(row=row_idx, column=1, value=str(tx.date or ""))
+        c_dt.font = font_normal
+        c_dt.alignment = align_center
 
-        # Numeric: Importo
+        c_id = ws4.cell(row=row_idx, column=2, value=str(tx.id or ""))
+        c_id.font = font_normal
+        c_id.alignment = align_center
+
+        c_aid = ws4.cell(row=row_idx, column=3, value=str(tx.account_id or ""))
+        c_aid.font = font_normal
+        c_aid.alignment = align_center
+
+        c_anm = ws4.cell(row=row_idx, column=4, value=acc_map.get(tx.account_id, str(tx.account_id or "")))
+        c_anm.font = font_normal
+        c_anm.alignment = align_left
+
+        c_typ = ws4.cell(row=row_idx, column=5, value=str(tx.type or ""))
+        c_typ.font = font_normal
+        c_typ.alignment = align_left
+
+        c_cat = ws4.cell(row=row_idx, column=6, value=str(tx.category or "Altro"))
+        c_cat.font = font_normal
+        c_cat.alignment = align_left
+
+        # Numeric: Importo (Right-Aligned)
         c_amt = ws4.cell(row=row_idx, column=7, value=_to_num(tx.amount))
         c_amt.number_format = FMT_CURRENCY
         c_amt.font = font_bold
+        c_amt.alignment = align_right
 
-        # Numeric: Commissioni
+        # Numeric: Commissioni (Right-Aligned)
         c_fee = ws4.cell(row=row_idx, column=8, value=_to_num(tx.fees, default=0.0))
         c_fee.number_format = FMT_CURRENCY_PLAIN
         c_fee.font = font_normal
+        c_fee.alignment = align_right
 
-        ws4.cell(row=row_idx, column=9, value=str(tx.currency or "EUR")).font = font_normal
-        ws4.cell(row=row_idx, column=10, value=str(tx.description or "")).font = font_normal
-        ws4.cell(row=row_idx, column=11, value=str(tx.asset_symbol or "")).font = font_normal
+        c_cur = ws4.cell(row=row_idx, column=9, value=str(tx.currency or "EUR"))
+        c_cur.font = font_normal
+        c_cur.alignment = align_center
 
-        # Numeric: Quantità (if present)
+        c_dsc = ws4.cell(row=row_idx, column=10, value=str(tx.description or ""))
+        c_dsc.font = font_normal
+        c_dsc.alignment = align_left
+
+        c_sym = ws4.cell(row=row_idx, column=11, value=str(tx.asset_symbol or ""))
+        c_sym.font = font_normal
+        c_sym.alignment = align_center
+
+        # Numeric: Quantità (Right-Aligned)
         if tx.quantity is not None:
             c_tx_qty = ws4.cell(row=row_idx, column=12, value=_to_num(tx.quantity))
             c_tx_qty.number_format = FMT_QTY
             c_tx_qty.font = font_normal
+            c_tx_qty.alignment = align_right
         else:
             ws4.cell(row=row_idx, column=12, value="").font = font_normal
 
-        # Numeric: Prezzo Unitario (if present)
+        # Numeric: Prezzo Unitario (Right-Aligned)
         if tx.unit_price is not None:
             c_tx_px = ws4.cell(row=row_idx, column=13, value=_to_num(tx.unit_price))
             c_tx_px.number_format = FMT_CURRENCY_PLAIN
             c_tx_px.font = font_normal
+            c_tx_px.alignment = align_right
         else:
             ws4.cell(row=row_idx, column=13, value="").font = font_normal
 
@@ -411,17 +537,22 @@ def generate_excel_report(
 
     if transactions:
         tot_tx_row = current_row_tx
-        ws4.cell(row=tot_tx_row, column=1, value="TOTALE FLUSSI & COMMISSIONI").font = font_total
+        c_tot_tx_lbl = ws4.cell(row=tot_tx_row, column=1, value="TOTALE FLUSSI & COMMISSIONI")
+        c_tot_tx_lbl.font = font_total
+        c_tot_tx_lbl.alignment = align_left
+
         for c_empty in range(2, 7):
             ws4.cell(row=tot_tx_row, column=c_empty, value="")
 
         t_amt = ws4.cell(row=tot_tx_row, column=7, value=f"=SUM(G{start_row_tx}:G{tot_tx_row - 1})")
         t_amt.number_format = FMT_CURRENCY
         t_amt.font = font_total
+        t_amt.alignment = align_right
 
         t_fees = ws4.cell(row=tot_tx_row, column=8, value=f"=SUM(H{start_row_tx}:H{tot_tx_row - 1})")
         t_fees.number_format = FMT_CURRENCY_PLAIN
         t_fees.font = font_total
+        t_fees.alignment = align_right
 
         for c_empty in range(9, 14):
             ws4.cell(row=tot_tx_row, column=c_empty, value="")
@@ -437,7 +568,6 @@ def generate_excel_report(
             for cell in col:
                 val = cell.value
                 if val is not None:
-                    # Ignore formula string lengths for width estimation
                     s = str(val)
                     if not s.startswith("="):
                         max_len = max(max_len, len(s))

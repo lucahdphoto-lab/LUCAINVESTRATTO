@@ -121,16 +121,17 @@ def render_export_view(selected_account_id: str = "all", selected_account_name: 
         - Pronto per Excel, Python, PowerBI
         """)
         try:
-            # Format selection: Standard (comma/dot) or Excel IT (semicolon/comma)
+            # Format selection: Excel IT as default for immediate double-click compatibility
             csv_fmt = st.radio(
-                "Separatore CSV:",
-                ["Standard (, / .)", "Excel IT (; / ,)"],
+                "Formato CSV:",
+                ["🇮🇹 Excel Italiano (; separatore / , decimale)", "🌐 Standard Internazionale (, separatore / . decimale)"],
                 index=0,
                 key="export_csv_fmt",
-                horizontal=True
+                horizontal=False,
+                help="Seleziona Excel Italiano se apri il CSV con Microsoft Excel in italiano, per avere numeri riconosciuti e allineati a destra."
             )
-            delimiter = ";" if "Excel IT" in csv_fmt else ","
-            decimal = "," if "Excel IT" in csv_fmt else "."
+            delimiter = ";" if "Excel Italiano" in csv_fmt else ","
+            decimal = "," if "Excel Italiano" in csv_fmt else "."
 
             tx_csv_bytes = generate_transactions_csv(
                 transactions=transactions,

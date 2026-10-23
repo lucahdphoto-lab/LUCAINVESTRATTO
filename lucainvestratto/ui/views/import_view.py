@@ -75,12 +75,18 @@ def render_import_view():
                             "Data": tx.date,
                             "Tipo": tx.type,
                             "Categoria": tx.category,
-                            "Importo (€)": f"€ {tx.amount:,.2f}",
+                            "Importo (€)": float(tx.amount),
                             "Descrizione": tx.description
                         }
                         for tx in parse_result.transactions[:25]
                     ]
-                    st.dataframe(pd.DataFrame(preview_data), use_container_width=True)
+                    st.dataframe(
+                        pd.DataFrame(preview_data),
+                        column_config={
+                            "Importo (€)": st.column_config.NumberColumn(format="€ %.2f")
+                        },
+                        use_container_width=True
+                    )
 
                     if st.button("🚀 Conferma ed Importa Transazioni nel Database", type="primary"):
                         saved = db.save_transactions(parse_result.transactions)
@@ -104,14 +110,23 @@ def render_import_view():
                             "Simbolo": h.symbol,
                             "Nome": h.name,
                             "Asset Class": h.asset_class,
-                            "Quantità": h.quantity,
-                            "PMC (€)": f"€ {h.average_buy_price:,.2f}",
-                            "Prezzo (€)": f"€ {h.current_price:,.2f}",
-                            "Controvalore (€)": f"€ {h.market_value:,.2f}"
+                            "Quantità": float(h.quantity),
+                            "PMC (€)": float(h.average_buy_price),
+                            "Prezzo (€)": float(h.current_price),
+                            "Controvalore (€)": float(h.market_value)
                         }
                         for h in parse_result.holdings
                     ]
-                    st.dataframe(pd.DataFrame(preview_holdings), use_container_width=True)
+                    st.dataframe(
+                        pd.DataFrame(preview_holdings),
+                        column_config={
+                            "Quantità": st.column_config.NumberColumn(format="%.4f"),
+                            "PMC (€)": st.column_config.NumberColumn(format="€ %.2f"),
+                            "Prezzo (€)": st.column_config.NumberColumn(format="€ %.2f"),
+                            "Controvalore (€)": st.column_config.NumberColumn(format="€ %.2f"),
+                        },
+                        use_container_width=True
+                    )
 
                     if st.button("🚀 Conferma ed Importa Posizioni nel Portafoglio", type="primary"):
                         saved = db.save_holdings(parse_result.holdings)

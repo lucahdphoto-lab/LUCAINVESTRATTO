@@ -119,12 +119,14 @@ class TestNumericExports(unittest.TestCase):
             if cell_b.value is not None:
                 self.assertIn(cell_b.data_type, ['n', 'f'], f"Cell {cell_b.coordinate} must be numeric, got {cell_b.data_type}: {cell_b.value}")
                 self.assertIsInstance(cell_b.value, (int, float), f"Cell {cell_b.coordinate} value must be int/float")
+                self.assertEqual(cell_b.alignment.horizontal, 'right', f"Cell {cell_b.coordinate} must be right-aligned")
                 self.assertFalse(str(cell_b.value).startswith("€"), f"Cell {cell_b.coordinate} contains raw currency string")
 
             cell_e = ws1[f"E{row}"]
             if cell_e.value is not None:
                 self.assertIn(cell_e.data_type, ['n', 'f'], f"Cell {cell_e.coordinate} must be numeric, got {cell_e.data_type}: {cell_e.value}")
                 self.assertIsInstance(cell_e.value, (int, float), f"Cell {cell_e.coordinate} value must be int/float")
+                self.assertEqual(cell_e.alignment.horizontal, 'right', f"Cell {cell_e.coordinate} must be right-aligned")
 
         # 2. Sheet 2: Asset Allocation
         ws2 = wb["Asset Allocation"]
@@ -133,6 +135,7 @@ class TestNumericExports(unittest.TestCase):
                 cell = ws2.cell(row=row, column=col)
                 if cell.value is not None:
                     self.assertIn(cell.data_type, ['n', 'f'], f"Sheet2 {cell.coordinate} must be numeric/formula, got {cell.data_type}")
+                    self.assertEqual(cell.alignment.horizontal, 'right', f"Sheet2 {cell.coordinate} must be right-aligned")
                     if cell.data_type == 'n':
                         self.assertIsInstance(cell.value, (int, float))
 
@@ -146,6 +149,7 @@ class TestNumericExports(unittest.TestCase):
                 cell = ws3.cell(row=row, column=col)
                 if cell.value is not None and str(cell.value).strip() != "":
                     self.assertIn(cell.data_type, ['n', 'f'], f"Sheet3 {cell.coordinate} must be numeric/formula, got {cell.data_type}: {cell.value}")
+                    self.assertEqual(cell.alignment.horizontal, 'right', f"Sheet3 {cell.coordinate} must be right-aligned")
                     if cell.data_type == 'n':
                         self.assertIsInstance(cell.value, (int, float))
                         self.assertFalse("€" in str(cell.value), f"Sheet3 {cell.coordinate} must not contain € text")
@@ -159,6 +163,7 @@ class TestNumericExports(unittest.TestCase):
                 cell = ws4.cell(row=row, column=col)
                 if cell.value is not None and str(cell.value).strip() != "":
                     self.assertIn(cell.data_type, ['n', 'f'], f"Sheet4 {cell.coordinate} must be numeric/formula, got {cell.data_type}: {cell.value}")
+                    self.assertEqual(cell.alignment.horizontal, 'right', f"Sheet4 {cell.coordinate} must be right-aligned")
                     if cell.data_type == 'n':
                         self.assertIsInstance(cell.value, (int, float))
 
