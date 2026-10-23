@@ -205,6 +205,8 @@ def render_investment_view(selected_account_id: str = "all"):
         {"Parametro Analitico": "Tracking Error", "Portafoglio": f"{risk_data['tracking_error']:.2f}%", "Benchmark": "-", "Descrizione": "Volatilità dello scostamento rispetto al benchmark"},
         {"Parametro Analitico": "Information Ratio", "Portafoglio": f"{risk_data['information_ratio']:.2f}", "Benchmark": "-", "Descrizione": "Efficienza dell'extra-rendimento rispetto al tracking error"},
         {"Parametro Analitico": "Percentuale Giorni Positivi (Win Rate)", "Portafoglio": f"{risk_data['win_rate']:.1f}%", "Benchmark": "-", "Descrizione": "Frequenza di sessioni di mercato con rendimento > 0"}
+    ]
+
     df_stat = pd.DataFrame(stat_data)
     st.dataframe(
         df_stat.style.set_properties(subset=["Portafoglio", "Benchmark"], **{'text-align': 'right'}),
