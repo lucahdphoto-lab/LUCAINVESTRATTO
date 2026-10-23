@@ -116,21 +116,39 @@ def render_asset_view(selected_account_id: str = "all"):
         "P&L (€)", "P&L (%)", "Peso (%)", "Yield (%)"
     ]
 
+    # Ensure numeric columns are float
+    numeric_cols = ["Quantità", "PMC (€)", "Prezzo Attuale (€)", "Costo Totale (€)", "Controvalore (€)", "P&L (€)", "P&L (%)", "Peso (%)", "Yield (%)"]
+    for nc in numeric_cols:
+        df_table[nc] = pd.to_numeric(df_table[nc], errors="coerce").fillna(0.0)
+
+    c_tbl, c_dl = st.columns([4, 1])
+    with c_dl:
+        csv_data = df_table.to_csv(index=False).encode("utf-8-sig")
+        st.download_button(
+            label="📥 Esporta CSV",
+            data=csv_data,
+            file_name="LUCAINVESTRATTO_Posizioni.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+
     st.dataframe(
-        df_table.style.format({
-            "Quantità": "{:,.2f}",
-            "PMC (€)": "€ {:,.2f}",
-            "Prezzo Attuale (€)": "€ {:,.2f}",
-            "Costo Totale (€)": "€ {:,.2f}",
-            "Controvalore (€)": "€ {:,.2f}",
-            "P&L (€)": "€ {:+,.2f}",
-            "P&L (%)": "{:+.2f}%",
-            "Peso (%)": "{:.1f}%",
-            "Yield (%)": "{:.2f}%"
-        }),
+        df_table,
+        column_config={
+            "Quantità": st.column_config.NumberColumn(format="%.4f"),
+            "PMC (€)": st.column_config.NumberColumn(format="€ %.2f"),
+            "Prezzo Attuale (€)": st.column_config.NumberColumn(format="€ %.2f"),
+            "Costo Totale (€)": st.column_config.NumberColumn(format="€ %.2f"),
+            "Controvalore (€)": st.column_config.NumberColumn(format="€ %.2f"),
+            "P&L (€)": st.column_config.NumberColumn(format="€ %.2f"),
+            "P&L (%)": st.column_config.NumberColumn(format="%.2f %%"),
+            "Peso (%)": st.column_config.NumberColumn(format="%.2f %%"),
+            "Yield (%)": st.column_config.NumberColumn(format="%.2f %%"),
+        },
         use_container_width=True,
         height=360
     )
+
 
     # 5. Quick Price Updater / Position Management
     with st.expander("✏️ Aggiorna Prezzo di Mercato o Gestisci Posizione"):

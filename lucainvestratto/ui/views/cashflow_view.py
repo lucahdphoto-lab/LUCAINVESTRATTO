@@ -226,10 +226,29 @@ def render_cashflow_view(selected_account_id: str = "all"):
 
     if table_rows:
         df_display = pd.DataFrame(table_rows)
+        # Ensure Importo is float
+        df_display["Importo (€)"] = df_display["Importo (€)"].astype(float)
+        
+        c_tbl, c_dl = st.columns([4, 1])
+        with c_dl:
+            csv_data = df_display.to_csv(index=False).encode("utf-8-sig")
+            st.download_button(
+                label="📥 Esporta CSV",
+                data=csv_data,
+                file_name="LUCAINVESTRATTO_Movimenti.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+
         st.dataframe(
-            df_display.style.format({
-                "Importo (€)": "€ {:,.2f}"
-            }),
+            df_display,
+            column_config={
+                "Importo (€)": st.column_config.NumberColumn(
+                    "Importo (€)",
+                    format="€ %.2f",
+                    help="Importo dell'operazione contabile"
+                )
+            },
             use_container_width=True,
             height=380
         )

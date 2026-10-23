@@ -228,27 +228,36 @@ def render_snapshots_view():
                 comp_data = [
                     {
                         "Componente": "Liquidità Disponibile & Depositi",
-                        "Valore Snapshot (€)": f"€ {recon['reported_cash']:,.2f}",
-                        "Valore Contabile Sistema (€)": f"€ {recon['internal_cash']:,.2f}",
-                        "Scostamento (€)": f"€ {recon['delta_cash']:,.2f}",
+                        "Valore Snapshot (€)": float(recon['reported_cash']),
+                        "Valore Contabile Sistema (€)": float(recon['internal_cash']),
+                        "Scostamento (€)": float(recon['delta_cash']),
                         "Stato": "✅" if abs(recon['delta_cash']) < 5.0 else "⚠️"
                     },
                     {
                         "Componente": "Portafoglio Titoli Investito",
-                        "Valore Snapshot (€)": f"€ {recon['reported_invested']:,.2f}",
-                        "Valore Contabile Sistema (€)": f"€ {recon['internal_invested']:,.2f}",
-                        "Scostamento (€)": f"€ {recon['delta_invested']:,.2f}",
+                        "Valore Snapshot (€)": float(recon['reported_invested']),
+                        "Valore Contabile Sistema (€)": float(recon['internal_invested']),
+                        "Scostamento (€)": float(recon['delta_invested']),
                         "Stato": "✅" if abs(recon['delta_invested']) < 10.0 else "⚠️"
                     },
                     {
                         "Componente": "TOTALE PATRIMONIO",
-                        "Valore Snapshot (€)": f"€ {recon['reported_total']:,.2f}",
-                        "Valore Contabile Sistema (€)": f"€ {recon['internal_total']:,.2f}",
-                        "Scostamento (€)": f"€ {recon['delta_total']:,.2f}",
+                        "Valore Snapshot (€)": float(recon['reported_total']),
+                        "Valore Contabile Sistema (€)": float(recon['internal_total']),
+                        "Scostamento (€)": float(recon['delta_total']),
                         "Stato": "✅" if abs(recon['delta_total']) < 1.0 else ("⚠️" if abs(recon['delta_total']) < 50.0 else "❌")
                     }
                 ]
-                st.dataframe(pd.DataFrame(comp_data), use_container_width=True)
+                st.dataframe(
+                    pd.DataFrame(comp_data),
+                    column_config={
+                        "Valore Snapshot (€)": st.column_config.NumberColumn(format="€ %.2f"),
+                        "Valore Contabile Sistema (€)": st.column_config.NumberColumn(format="€ %.2f"),
+                        "Scostamento (€)": st.column_config.NumberColumn(format="€ %.2f"),
+                    },
+                    use_container_width=True
+                )
+
 
                 # Asset Level Breakdown if present
                 df_alloc_comp = recon.get("df_alloc_comparison")

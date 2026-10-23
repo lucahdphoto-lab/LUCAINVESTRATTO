@@ -1,9 +1,11 @@
 """
 Institutional Excel report generator for LUCAINVESTRATTO.
 Creates a professional multi-sheet formatted workbook (.xlsx) using OpenPyXL.
+Ensures ALL numeric data is strictly typed as numeric (float/int), NEVER as formatted text.
+Standard Excel number formats and active formulas are applied for maximum compatibility.
 """
 import io
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -15,6 +17,20 @@ from lucainvestratto.analytics.assets import calculate_asset_summary
 from lucainvestratto.analytics.risk import calculate_risk_metrics
 
 
+def _to_num(val: Any, default: float = 0.0) -> float:
+    """Ensures value is a native float without NaN, None, or string issues."""
+    if val is None:
+        return default
+    try:
+        f = float(val)
+        import math
+        if math.isnan(f) or math.isinf(f):
+            return default
+        return f
+    except (ValueError, TypeError):
+        return default
+
+
 def generate_excel_report(
     accounts: List[BankAccount],
     holdings: List[Holding],
@@ -24,33 +40,43 @@ def generate_excel_report(
 ) -> bytes:
     wb = openpyxl.Workbook()
 
-    # Styling definitions
+    # Typography & Colors
     font_title = Font(name="Calibri", size=16, bold=True, color="0F172A")
     font_subtitle = Font(name="Calibri", size=10, italic=True, color="64748B")
     font_header = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
     font_bold = Font(name="Calibri", size=11, bold=True, color="1E293B")
     font_normal = Font(name="Calibri", size=10, color="1E293B")
-    
-    fill_header = PatternFill(start_color="0F172A", end_color="0F172A", fill_type="solid")
-    fill_sub_header = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
-    fill_alt = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
-    fill_card = PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid")
+    font_total = Font(name="Calibri", size=11, bold=True, color="0F172A")
 
-    thin_border = Border(
-        left=Side(style='thin', color='CBD5E1'),
-        right=Side(style='thin', color='CBD5E1'),
-        top=Side(style='thin', color='CBD5E1'),
-        bottom=Side(style='thin', color='CBD5E1')
-    )
+    fill_header = PatternFill(start_color="0F172A", end_color="0F172A", fill_type="solid")
+    fill_alt = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
+    fill_total = PatternFill(start_color="E2E8F0", end_color="E2E8F0", fill_type="solid")
+
+    thin_side = Side(style='thin', color='CBD5E1')
+    double_bottom_side = Side(style='double', color='0F172A')
+    thick_top_side = Side(style='medium', color='0F172A')
+
+    thin_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
+    total_border = Border(left=thin_side, right=thin_side, top=thick_top_side, bottom=double_bottom_side)
+
+    # Standard Excel Number Formats
+    FMT_CURRENCY = '#,##0.00 €;[Red]-#,##0.00 €;0.00 €'
+    FMT_CURRENCY_PLAIN = '#,##0.00 €'
+    FMT_PCT_SIGNED = '+0.00%;-0.00%;0.00%'
+    FMT_PCT = '0.00%'
+    FMT_QTY = '#,##0.0000'
+    FMT_DECIMAL = '0.00'
 
     # Compute analytics
     cash_sum = calculate_cashflow_summary(transactions, accounts)
     asset_sum = calculate_asset_summary(holdings)
     risk_sum = calculate_risk_metrics(holdings, benchmark_code=benchmark_code)
 
-    tot_liquidita = cash_sum["final_balance"]
-    tot_investito = asset_sum["total_market_value"]
+    tot_liquidita = _to_num(cash_sum.get("final_balance", 0.0))
+    tot_investito = _to_num(asset_sum.get("total_market_value", 0.0))
     patrimonio_totale = tot_liquidita + tot_investito
+
+    acc_map = {a.id: a.name for a in accounts}
 
     # ================= SHEET 1: SINTESI & METRICHE =================
     ws1 = wb.active
@@ -73,44 +99,58 @@ def generate_excel_report(
         ws1[col].alignment = Alignment(horizontal="center")
 
     kpi_left = [
-        ("Patrimonio Netto Totale", patrimonio_totale, "€ #,##0.00"),
-        ("Liquidità Totale Conti", tot_liquidita, "€ #,##0.00"),
-        ("Controvalore Portafoglio", tot_investito, "€ #,##0.00"),
-        ("Costo Storico (PMC)", asset_sum["total_invested"], "€ #,##0.00"),
-        ("Plus/Minusvalenza Latente", asset_sum["total_unrealized_pl"], "€ #,##0.00"),
-        ("Plus/Minusvalenza %", asset_sum["total_unrealized_pl_pct"] / 100.0, "+0.00%;-0.00%"),
-        ("Flusso Netto Cassa Periodo", cash_sum["net_cashflow"], "€ #,##0.00"),
-        ("Tasso di Risparmio", cash_sum["savings_rate_pct"] / 100.0, "0.0%")
+        ("Patrimonio Netto Totale", patrimonio_totale, FMT_CURRENCY),
+        ("Liquidità Totale Conti", tot_liquidita, FMT_CURRENCY),
+        ("Controvalore Portafoglio", tot_investito, FMT_CURRENCY),
+        ("Costo Storico (PMC)", _to_num(asset_sum.get("total_invested", 0.0)), FMT_CURRENCY),
+        ("Plus/Minusvalenza Latente", _to_num(asset_sum.get("total_unrealized_pl", 0.0)), FMT_CURRENCY),
+        ("Plus/Minusvalenza %", _to_num(asset_sum.get("total_unrealized_pl_pct", 0.0)) / 100.0, FMT_PCT_SIGNED),
+        ("Flusso Netto Cassa Periodo", _to_num(cash_sum.get("net_cashflow", 0.0)), FMT_CURRENCY),
+        ("Tasso di Risparmio", _to_num(cash_sum.get("savings_rate_pct", 0.0)) / 100.0, FMT_PCT),
+        ("Dividendi Annui Stimati", _to_num(asset_sum.get("expected_annual_income", 0.0)), FMT_CURRENCY),
+        ("Dividend Yield di Portafoglio", _to_num(asset_sum.get("portfolio_dividend_yield", 0.0)) / 100.0, FMT_PCT)
     ]
 
     kpi_right = [
-        ("Indice di Sharpe (Ann.)", risk_sum["sharpe_ratio"], "0.00"),
-        ("Indice di Sortino", risk_sum["sortino_ratio"], "0.00"),
-        ("Rendimento Annualizzato (CAGR)", risk_sum["cagr"] / 100.0, "+0.00%;-0.00%"),
-        ("Volatilità Annualizzata", risk_sum["volatility_annualized"] / 100.0, "0.00%"),
-        ("Massimo Drawdown (MDD)", risk_sum["max_drawdown"] / 100.0, "0.00%"),
-        ("Value at Risk (VaR 95% Ann.)", risk_sum["var_95_annual"] / 100.0, "0.00%"),
-        ("Beta vs Benchmark", risk_sum["beta"], "0.00"),
-        ("Alfa di Jensen", risk_sum["alpha_jensen"] / 100.0, "+0.00%;-0.00%")
+        ("Indice di Sharpe (Ann.)", _to_num(risk_sum.get("sharpe_ratio", 0.0)), FMT_DECIMAL),
+        ("Indice di Sortino", _to_num(risk_sum.get("sortino_ratio", 0.0)), FMT_DECIMAL),
+        ("Indice di Calmar", _to_num(risk_sum.get("calmar_ratio", 0.0)), FMT_DECIMAL),
+        ("Indice di Treynor", _to_num(risk_sum.get("treynor_ratio", 0.0)), FMT_DECIMAL),
+        ("Rendimento Annualizzato (CAGR)", _to_num(risk_sum.get("cagr", 0.0)) / 100.0, FMT_PCT_SIGNED),
+        ("Volatilità Annualizzata", _to_num(risk_sum.get("volatility_annualized", 0.0)) / 100.0, FMT_PCT),
+        ("Massimo Drawdown (MDD)", _to_num(risk_sum.get("max_drawdown", 0.0)) / 100.0, FMT_PCT),
+        ("Value at Risk (VaR 95% Ann.)", _to_num(risk_sum.get("var_95_annual", 0.0)) / 100.0, FMT_PCT),
+        ("Value at Risk (VaR 99% Ann.)", _to_num(risk_sum.get("var_99_annual", 0.0)) / 100.0, FMT_PCT),
+        ("Conditional VaR (CVaR 95%)", _to_num(risk_sum.get("cvar_95_annual", 0.0)) / 100.0, FMT_PCT),
+        ("Beta vs Benchmark", _to_num(risk_sum.get("beta", 1.0)), FMT_DECIMAL),
+        ("Alfa di Jensen", _to_num(risk_sum.get("alpha_jensen", 0.0)) / 100.0, FMT_PCT_SIGNED),
+        ("Coefficiente Determinazione (R²)", _to_num(risk_sum.get("r_squared", 0.0)), FMT_DECIMAL),
+        ("Tracking Error vs Benchmark", _to_num(risk_sum.get("tracking_error", 0.0)) / 100.0, FMT_PCT),
+        ("Information Ratio", _to_num(risk_sum.get("information_ratio", 0.0)), FMT_DECIMAL),
+        ("Win Rate Giornaliero", _to_num(risk_sum.get("win_rate", 0.0)) / 100.0, FMT_PCT)
     ]
 
     for idx, (label, val, fmt) in enumerate(kpi_left, start=5):
         ws1[f"A{idx}"] = label
         ws1[f"A{idx}"].font = font_bold if idx == 5 else font_normal
         ws1[f"A{idx}"].border = thin_border
-        ws1[f"B{idx}"] = val
-        ws1[f"B{idx}"].font = font_bold if idx == 5 else font_normal
-        ws1[f"B{idx}"].number_format = fmt
-        ws1[f"B{idx}"].border = thin_border
+        
+        c = ws1[f"B{idx}"]
+        c.value = _to_num(val)
+        c.font = font_bold if idx == 5 else font_normal
+        c.number_format = fmt
+        c.border = thin_border
 
     for idx, (label, val, fmt) in enumerate(kpi_right, start=5):
         ws1[f"D{idx}"] = label
         ws1[f"D{idx}"].font = font_normal
         ws1[f"D{idx}"].border = thin_border
-        ws1[f"E{idx}"] = val
-        ws1[f"E{idx}"].font = font_bold if idx in [5, 6, 7] else font_normal
-        ws1[f"E{idx}"].number_format = fmt
-        ws1[f"E{idx}"].border = thin_border
+        
+        c = ws1[f"E{idx}"]
+        c.value = _to_num(val)
+        c.font = font_bold if idx in [5, 6, 7] else font_normal
+        c.number_format = fmt
+        c.border = thin_border
 
     # ================= SHEET 2: ASSET ALLOCATION =================
     ws2 = wb.create_sheet(title="Asset Allocation")
@@ -125,35 +165,68 @@ def generate_excel_report(
         cell.fill = fill_header
         cell.alignment = Alignment(horizontal="center")
 
-    df_class = asset_sum["df_by_class"]
-    if not df_class.empty:
-        for row_idx, r in enumerate(df_class.itertuples(), start=4):
-            ws2.cell(row=row_idx, column=1, value=str(r.asset_class)).font = font_bold
+    df_class = asset_sum.get("df_by_class")
+    start_row_alloc = 4
+    current_row_alloc = start_row_alloc
+
+    if df_class is not None and not df_class.empty:
+        for r in df_class.itertuples():
+            row_idx = current_row_alloc
+            ws2.cell(row=row_idx, column=1, value=str(getattr(r, "asset_class", ""))).font = font_bold
             
-            c2 = ws2.cell(row=row_idx, column=2, value=float(r.market_value))
-            c2.number_format = "€ #,##0.00"
+            c2 = ws2.cell(row=row_idx, column=2, value=_to_num(getattr(r, "market_value", 0.0)))
+            c2.number_format = FMT_CURRENCY_PLAIN
             c2.font = font_normal
 
-            c3 = ws2.cell(row=row_idx, column=3, value=float(r.total_cost))
-            c3.number_format = "€ #,##0.00"
+            c3 = ws2.cell(row=row_idx, column=3, value=_to_num(getattr(r, "total_cost", 0.0)))
+            c3.number_format = FMT_CURRENCY_PLAIN
             c3.font = font_normal
 
-            c4 = ws2.cell(row=row_idx, column=4, value=float(r.weight_pct) / 100.0)
-            c4.number_format = "0.0%"
+            c4 = ws2.cell(row=row_idx, column=4, value=_to_num(getattr(r, "weight_pct", 0.0)) / 100.0)
+            c4.number_format = FMT_PCT
             c4.font = font_normal
 
-            c5 = ws2.cell(row=row_idx, column=5, value=float(r.unrealized_pl))
-            c5.number_format = "€ #,##0.00"
+            c5 = ws2.cell(row=row_idx, column=5, value=_to_num(getattr(r, "unrealized_pl", 0.0)))
+            c5.number_format = FMT_CURRENCY
             c5.font = font_normal
 
-            c6 = ws2.cell(row=row_idx, column=6, value=float(r.pl_pct) / 100.0)
-            c6.number_format = "+0.00%;-0.00%"
+            c6 = ws2.cell(row=row_idx, column=6, value=_to_num(getattr(r, "pl_pct", 0.0)) / 100.0)
+            c6.number_format = FMT_PCT_SIGNED
             c6.font = font_normal
 
             for c in range(1, 7):
                 ws2.cell(row=row_idx, column=c).border = thin_border
                 if row_idx % 2 == 0:
                     ws2.cell(row=row_idx, column=c).fill = fill_alt
+            current_row_alloc += 1
+
+        # Totals Row with active formulas
+        tot_row = current_row_alloc
+        ws2.cell(row=tot_row, column=1, value="TOTALE PORTAFOGLIO").font = font_total
+        
+        tc2 = ws2.cell(row=tot_row, column=2, value=f"=SUM(B{start_row_alloc}:B{tot_row - 1})")
+        tc2.number_format = FMT_CURRENCY_PLAIN
+        tc2.font = font_total
+
+        tc3 = ws2.cell(row=tot_row, column=3, value=f"=SUM(C{start_row_alloc}:C{tot_row - 1})")
+        tc3.number_format = FMT_CURRENCY_PLAIN
+        tc3.font = font_total
+
+        tc4 = ws2.cell(row=tot_row, column=4, value=f"=SUM(D{start_row_alloc}:D{tot_row - 1})")
+        tc4.number_format = FMT_PCT
+        tc4.font = font_total
+
+        tc5 = ws2.cell(row=tot_row, column=5, value=f"=SUM(E{start_row_alloc}:E{tot_row - 1})")
+        tc5.number_format = FMT_CURRENCY
+        tc5.font = font_total
+
+        tc6 = ws2.cell(row=tot_row, column=6, value=f"=IF(C{tot_row}>0, (B{tot_row}-C{tot_row})/C{tot_row}, 0)")
+        tc6.number_format = FMT_PCT_SIGNED
+        tc6.font = font_total
+
+        for c in range(1, 7):
+            ws2.cell(row=tot_row, column=c).border = total_border
+            ws2.cell(row=tot_row, column=c).fill = fill_total
 
     # ================= SHEET 3: POSIZIONI DETTAGLIATE =================
     ws3 = wb.create_sheet(title="Posizioni Portafoglio")
@@ -162,9 +235,10 @@ def generate_excel_report(
     ws3["A1"].font = font_title
 
     headers_pos = [
-        "Simbolo / ISIN", "Nome Strumento", "Asset Class", "Settore", "Geo",
+        "Simbolo / ISIN", "Nome Strumento", "Asset Class", "Settore", "Geografia", "Valuta",
         "Quantità", "PMC (€)", "Prezzo Attuale (€)", "Costo Totale (€)",
-        "Controvalore (€)", "P&L (€)", "Rendimento (%)", "Peso (%)", "Yield Dividendo (%)"
+        "Controvalore (€)", "P&L (€)", "Rendimento (%)", "Peso (%)",
+        "Yield Dividendo (%)", "Reddito Annuo Stimato (€)"
     ]
     for col_idx, h in enumerate(headers_pos, 1):
         cell = ws3.cell(row=3, column=col_idx, value=h)
@@ -172,29 +246,103 @@ def generate_excel_report(
         cell.fill = fill_header
         cell.alignment = Alignment(horizontal="center")
 
-    df_holdings = asset_sum["df_holdings"]
-    if not df_holdings.empty:
-        for row_idx, h in enumerate(df_holdings.itertuples(), start=4):
-            ws3.cell(row=row_idx, column=1, value=str(h.symbol)).font = font_bold
-            ws3.cell(row=row_idx, column=2, value=str(h.name)).font = font_normal
-            ws3.cell(row=row_idx, column=3, value=str(h.asset_class)).font = font_normal
-            ws3.cell(row=row_idx, column=4, value=str(h.sector)).font = font_normal
-            ws3.cell(row=row_idx, column=5, value=str(h.geography)).font = font_normal
+    df_holdings = asset_sum.get("df_holdings")
+    start_row_h = 4
+    current_row_h = start_row_h
 
-            ws3.cell(row=row_idx, column=6, value=float(h.quantity)).number_format = "#,##0.00"
-            ws3.cell(row=row_idx, column=7, value=float(h.average_buy_price)).number_format = "€ #,##0.00"
-            ws3.cell(row=row_idx, column=8, value=float(h.current_price)).number_format = "€ #,##0.00"
-            ws3.cell(row=row_idx, column=9, value=float(h.total_cost)).number_format = "€ #,##0.00"
-            ws3.cell(row=row_idx, column=10, value=float(h.market_value)).number_format = "€ #,##0.00"
-            ws3.cell(row=row_idx, column=11, value=float(h.unrealized_pl)).number_format = "€ #,##0.00"
-            ws3.cell(row=row_idx, column=12, value=float(h.unrealized_pl_pct) / 100.0).number_format = "+0.00%;-0.00%"
-            ws3.cell(row=row_idx, column=13, value=float(h.weight_pct) / 100.0).number_format = "0.0%"
-            ws3.cell(row=row_idx, column=14, value=float(h.annual_dividend_yield) / 100.0).number_format = "0.00%"
+    if df_holdings is not None and not df_holdings.empty:
+        for h in df_holdings.itertuples():
+            row_idx = current_row_h
+            ws3.cell(row=row_idx, column=1, value=str(getattr(h, "symbol", ""))).font = font_bold
+            ws3.cell(row=row_idx, column=2, value=str(getattr(h, "name", ""))).font = font_normal
+            ws3.cell(row=row_idx, column=3, value=str(getattr(h, "asset_class", ""))).font = font_normal
+            ws3.cell(row=row_idx, column=4, value=str(getattr(h, "sector", ""))).font = font_normal
+            ws3.cell(row=row_idx, column=5, value=str(getattr(h, "geography", ""))).font = font_normal
+            ws3.cell(row=row_idx, column=6, value=str(getattr(h, "currency", "EUR"))).font = font_normal
 
-            for c in range(1, 15):
+            # Strictly numeric columns
+            c_qty = ws3.cell(row=row_idx, column=7, value=_to_num(getattr(h, "quantity", 0.0)))
+            c_qty.number_format = FMT_QTY
+            c_qty.font = font_normal
+
+            c_pmc = ws3.cell(row=row_idx, column=8, value=_to_num(getattr(h, "average_buy_price", 0.0)))
+            c_pmc.number_format = FMT_CURRENCY_PLAIN
+            c_pmc.font = font_normal
+
+            c_px = ws3.cell(row=row_idx, column=9, value=_to_num(getattr(h, "current_price", 0.0)))
+            c_px.number_format = FMT_CURRENCY_PLAIN
+            c_px.font = font_normal
+
+            c_cost = ws3.cell(row=row_idx, column=10, value=_to_num(getattr(h, "total_cost", 0.0)))
+            c_cost.number_format = FMT_CURRENCY_PLAIN
+            c_cost.font = font_normal
+
+            c_mv = ws3.cell(row=row_idx, column=11, value=_to_num(getattr(h, "market_value", 0.0)))
+            c_mv.number_format = FMT_CURRENCY_PLAIN
+            c_mv.font = font_normal
+
+            c_pl = ws3.cell(row=row_idx, column=12, value=_to_num(getattr(h, "unrealized_pl", 0.0)))
+            c_pl.number_format = FMT_CURRENCY
+            c_pl.font = font_normal
+
+            c_pl_pct = ws3.cell(row=row_idx, column=13, value=_to_num(getattr(h, "unrealized_pl_pct", 0.0)) / 100.0)
+            c_pl_pct.number_format = FMT_PCT_SIGNED
+            c_pl_pct.font = font_normal
+
+            c_w = ws3.cell(row=row_idx, column=14, value=_to_num(getattr(h, "weight_pct", 0.0)) / 100.0)
+            c_w.number_format = FMT_PCT
+            c_w.font = font_normal
+
+            c_yd = ws3.cell(row=row_idx, column=15, value=_to_num(getattr(h, "annual_dividend_yield", 0.0)) / 100.0)
+            c_yd.number_format = FMT_PCT
+            c_yd.font = font_normal
+
+            c_inc = ws3.cell(row=row_idx, column=16, value=_to_num(getattr(h, "expected_annual_income", 0.0)))
+            c_inc.number_format = FMT_CURRENCY_PLAIN
+            c_inc.font = font_normal
+
+            for c in range(1, 17):
                 ws3.cell(row=row_idx, column=c).border = thin_border
                 if row_idx % 2 == 0:
                     ws3.cell(row=row_idx, column=c).fill = fill_alt
+            current_row_h += 1
+
+        # Totals Row with active formulas
+        tot_h_row = current_row_h
+        ws3.cell(row=tot_h_row, column=1, value="TOTALE GENERALE").font = font_total
+
+        for c_empty in range(2, 10):
+            ws3.cell(row=tot_h_row, column=c_empty, value="")
+
+        t_cost = ws3.cell(row=tot_h_row, column=10, value=f"=SUM(J{start_row_h}:J{tot_h_row - 1})")
+        t_cost.number_format = FMT_CURRENCY_PLAIN
+        t_cost.font = font_total
+
+        t_mv = ws3.cell(row=tot_h_row, column=11, value=f"=SUM(K{start_row_h}:K{tot_h_row - 1})")
+        t_mv.number_format = FMT_CURRENCY_PLAIN
+        t_mv.font = font_total
+
+        t_pl = ws3.cell(row=tot_h_row, column=12, value=f"=SUM(L{start_row_h}:L{tot_h_row - 1})")
+        t_pl.number_format = FMT_CURRENCY
+        t_pl.font = font_total
+
+        t_pl_pct = ws3.cell(row=tot_h_row, column=13, value=f"=IF(J{tot_h_row}>0, L{tot_h_row}/J{tot_h_row}, 0)")
+        t_pl_pct.number_format = FMT_PCT_SIGNED
+        t_pl_pct.font = font_total
+
+        t_w = ws3.cell(row=tot_h_row, column=14, value=f"=SUM(N{start_row_h}:N{tot_h_row - 1})")
+        t_w.number_format = FMT_PCT
+        t_w.font = font_total
+
+        ws3.cell(row=tot_h_row, column=15, value="")
+
+        t_inc = ws3.cell(row=tot_h_row, column=16, value=f"=SUM(P{start_row_h}:P{tot_h_row - 1})")
+        t_inc.number_format = FMT_CURRENCY_PLAIN
+        t_inc.font = font_total
+
+        for c in range(1, 17):
+            ws3.cell(row=tot_h_row, column=c).border = total_border
+            ws3.cell(row=tot_h_row, column=c).fill = fill_total
 
     # ================= SHEET 4: ESTRATTO CONTO =================
     ws4 = wb.create_sheet(title="Estratto Conto Transazioni")
@@ -202,36 +350,97 @@ def generate_excel_report(
     ws4["A1"] = "ESTRATTO CONTO E MOVIMENTI BANCARI"
     ws4["A1"].font = font_title
 
-    headers_tx = ["Data", "Conto ID", "Tipo Operazione", "Categoria", "Importo (€)", "Valuta", "Descrizione / Causale", "Titolo"]
+    headers_tx = [
+        "Data", "ID Transazione", "ID Conto", "Nome Conto", "Tipo Operazione",
+        "Categoria", "Importo (€)", "Commissioni (€)", "Valuta",
+        "Descrizione / Causale", "Titolo / Ticker", "Quantità", "Prezzo Unitario (€)"
+    ]
     for col_idx, h in enumerate(headers_tx, 1):
         cell = ws4.cell(row=3, column=col_idx, value=h)
         cell.font = font_header
         cell.fill = fill_header
         cell.alignment = Alignment(horizontal="center")
 
-    for row_idx, tx in enumerate(transactions, start=4):
-        ws4.cell(row=row_idx, column=1, value=tx.date).font = font_normal
-        ws4.cell(row=row_idx, column=2, value=tx.account_id).font = font_normal
-        ws4.cell(row=row_idx, column=3, value=tx.type).font = font_normal
-        ws4.cell(row=row_idx, column=4, value=tx.category).font = font_normal
+    start_row_tx = 4
+    current_row_tx = start_row_tx
 
-        amt_cell = ws4.cell(row=row_idx, column=5, value=float(tx.amount))
-        amt_cell.number_format = "€ #,##0.00"
-        amt_cell.font = font_bold
+    for tx in transactions:
+        row_idx = current_row_tx
+        ws4.cell(row=row_idx, column=1, value=str(tx.date or "")).font = font_normal
+        ws4.cell(row=row_idx, column=2, value=str(tx.id or "")).font = font_normal
+        ws4.cell(row=row_idx, column=3, value=str(tx.account_id or "")).font = font_normal
+        ws4.cell(row=row_idx, column=4, value=acc_map.get(tx.account_id, str(tx.account_id or ""))).font = font_normal
+        ws4.cell(row=row_idx, column=5, value=str(tx.type or "")).font = font_normal
+        ws4.cell(row=row_idx, column=6, value=str(tx.category or "Altro")).font = font_normal
 
-        ws4.cell(row=row_idx, column=6, value=tx.currency).font = font_normal
-        ws4.cell(row=row_idx, column=7, value=tx.description).font = font_normal
-        ws4.cell(row=row_idx, column=8, value=tx.asset_symbol or "").font = font_normal
+        # Numeric: Importo
+        c_amt = ws4.cell(row=row_idx, column=7, value=_to_num(tx.amount))
+        c_amt.number_format = FMT_CURRENCY
+        c_amt.font = font_bold
 
-        for c in range(1, 9):
+        # Numeric: Commissioni
+        c_fee = ws4.cell(row=row_idx, column=8, value=_to_num(tx.fees, default=0.0))
+        c_fee.number_format = FMT_CURRENCY_PLAIN
+        c_fee.font = font_normal
+
+        ws4.cell(row=row_idx, column=9, value=str(tx.currency or "EUR")).font = font_normal
+        ws4.cell(row=row_idx, column=10, value=str(tx.description or "")).font = font_normal
+        ws4.cell(row=row_idx, column=11, value=str(tx.asset_symbol or "")).font = font_normal
+
+        # Numeric: Quantità (if present)
+        if tx.quantity is not None:
+            c_tx_qty = ws4.cell(row=row_idx, column=12, value=_to_num(tx.quantity))
+            c_tx_qty.number_format = FMT_QTY
+            c_tx_qty.font = font_normal
+        else:
+            ws4.cell(row=row_idx, column=12, value="").font = font_normal
+
+        # Numeric: Prezzo Unitario (if present)
+        if tx.unit_price is not None:
+            c_tx_px = ws4.cell(row=row_idx, column=13, value=_to_num(tx.unit_price))
+            c_tx_px.number_format = FMT_CURRENCY_PLAIN
+            c_tx_px.font = font_normal
+        else:
+            ws4.cell(row=row_idx, column=13, value="").font = font_normal
+
+        for c in range(1, 14):
             ws4.cell(row=row_idx, column=c).border = thin_border
             if row_idx % 2 == 0:
                 ws4.cell(row=row_idx, column=c).fill = fill_alt
+        current_row_tx += 1
 
-    # Auto-fit columns across all sheets
+    if transactions:
+        tot_tx_row = current_row_tx
+        ws4.cell(row=tot_tx_row, column=1, value="TOTALE FLUSSI & COMMISSIONI").font = font_total
+        for c_empty in range(2, 7):
+            ws4.cell(row=tot_tx_row, column=c_empty, value="")
+
+        t_amt = ws4.cell(row=tot_tx_row, column=7, value=f"=SUM(G{start_row_tx}:G{tot_tx_row - 1})")
+        t_amt.number_format = FMT_CURRENCY
+        t_amt.font = font_total
+
+        t_fees = ws4.cell(row=tot_tx_row, column=8, value=f"=SUM(H{start_row_tx}:H{tot_tx_row - 1})")
+        t_fees.number_format = FMT_CURRENCY_PLAIN
+        t_fees.font = font_total
+
+        for c_empty in range(9, 14):
+            ws4.cell(row=tot_tx_row, column=c_empty, value="")
+
+        for c in range(1, 14):
+            ws4.cell(row=tot_tx_row, column=c).border = total_border
+            ws4.cell(row=tot_tx_row, column=c).fill = fill_total
+
+    # Auto-fit columns across all sheets safely
     for ws in [ws1, ws2, ws3, ws4]:
         for col in ws.columns:
-            max_len = max(len(str(cell.value or '')) for cell in col)
+            max_len = 0
+            for cell in col:
+                val = cell.value
+                if val is not None:
+                    # Ignore formula string lengths for width estimation
+                    s = str(val)
+                    if not s.startswith("="):
+                        max_len = max(max_len, len(s))
             col_letter = get_column_letter(col[0].column)
             ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
 
