@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 
 from lucainvestratto.models import BankAccount, Holding, Transaction
-from lucainvestratto.export.excel_report import generate_excel_report
+from lucainvestratto.export.excel_report import generate_excel_report, generate_dataframe_excel
 from lucainvestratto.export.csv_report import (
     generate_transactions_csv,
     generate_holdings_csv,
@@ -235,6 +235,81 @@ class TestNumericExports(unittest.TestCase):
         df = pd.read_csv(io.BytesIO(csv_bytes), sep=";", decimal=",")
         self.assertEqual(df["Importo"].dtype, np.float64)
         self.assertAlmostEqual(df.loc[1, "Importo"], -850.50)
+
+    def test_dataframe_excel_movimenti(self):
+        """Verify that generate_dataframe_excel outputs numeric types, currency format, and right alignment."""
+        df = pd.DataFrame([
+            {"Data": "20/10/2026", "Conto": "Intesa", "Tipo": "Entrata", "Categoria": "Stipendio", "Importo (€)": 3650.0, "Descrizione": "Stipendio", "Titolo": "-"},
+            {"Data": "08/10/2026", "Conto": "Intesa", "Tipo": "Uscita", "Categoria": "Affitto", "Importo (€)": -1150.0, "Descrizione": "Canone", "Titolo": "-"}
+        ])
+        xlsx_bytes = generate_dataframe_excel(
+            df=df,
+            title="LUCAINVESTRATTO - Movimenti",
+            sheet_name="Movimenti",
+            currency_cols=["Importo (€)"],
+            center_cols=["Data", "Titolo"],
+            sum_cols=["Importo (€)"]
+        )
+        wb = openpyxl.load_workbook(io.BytesIO(xlsx_bytes))
+        ws = wb["Movimenti"]
+
+        # Cell E5 should be 3650.0, numeric, right-aligned, formatted currency
+        c1 = ws["E5"]
+        self.assertIsInstance(c1.value, (int, float))
+        self.assertEqual(c1.data_type, "n")
+        self.assertEqual(c1.value, 3650.0)
+        self.assertEqual(c1.alignment.horizontal, "right")
+        self.assertIn("€", c1.number_format)
+
+        # Cell E6 should be -1150.0, numeric, right-aligned
+        c2 = ws["E6"]
+        self.assertIsInstance(c2.value, (int, float))
+        self.assertEqual(c2.data_type, "n")
+        self.assertEqual(c2.value, -1150.0)
+        self.assertEqual(c2.alignment.horizontal, "right")
+
+        # Cell E7 should be formula sum =SUM(E5:E6), right-aligned
+        c_tot = ws["E7"]
+        self.assertEqual(c_tot.value, "=SUM(E5:E6)")
+        self.assertEqual(c_tot.alignment.horizontal, "right")
+
+    def test_dataframe_excel_posizioni(self):
+        """Verify that generate_dataframe_excel for holdings has numeric types, proper formats, and right alignment."""
+        df = pd.DataFrame([
+            {"Simbolo": "SWDA.MI", "Nome Titolo": "iShares Core MSCI World", "Quantità": 100.0, "PMC (€)": 80.0, "Prezzo Attuale (€)": 105.0, "Costo Totale (€)": 8000.0, "Controvalore (€)": 10500.0, "P&L (€)": 2500.0, "P&L (%)": 31.25, "Peso (%)": 100.0, "Yield (%)": 1.25}
+        ])
+        xlsx_bytes = generate_dataframe_excel(
+            df=df,
+            title="LUCAINVESTRATTO - Posizioni",
+            sheet_name="Posizioni",
+            currency_cols=["PMC (€)", "Prezzo Attuale (€)", "Costo Totale (€)", "Controvalore (€)", "P&L (€)"],
+            pct_cols=["P&L (%)", "Peso (%)", "Yield (%)"],
+            qty_cols=["Quantità"],
+            center_cols=["Simbolo"],
+            sum_cols=["Costo Totale (€)", "Controvalore (€)", "P&L (€)"]
+        )
+        wb = openpyxl.load_workbook(io.BytesIO(xlsx_bytes))
+        ws = wb["Posizioni"]
+
+        # Check Quantità (col C, row 5)
+        c_qty = ws["C5"]
+        self.assertEqual(c_qty.data_type, "n")
+        self.assertEqual(c_qty.value, 100.0)
+        self.assertEqual(c_qty.alignment.horizontal, "right")
+
+        # Check PMC (€) (col D, row 5)
+        c_pmc = ws["D5"]
+        self.assertEqual(c_pmc.data_type, "n")
+        self.assertEqual(c_pmc.value, 80.0)
+        self.assertEqual(c_pmc.alignment.horizontal, "right")
+        self.assertIn("€", c_pmc.number_format)
+
+        # Check P&L (%) (col I, row 5) - should be 0.3125 with percentage format
+        c_pct = ws["I5"]
+        self.assertEqual(c_pct.data_type, "n")
+        self.assertAlmostEqual(c_pct.value, 0.3125)
+        self.assertEqual(c_pct.alignment.horizontal, "right")
+        self.assertIn("%", c_pct.number_format)
 
 
 if __name__ == "__main__":

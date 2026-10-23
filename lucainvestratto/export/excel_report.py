@@ -8,6 +8,7 @@ on all numerical cells, guaranteeing seamless mathematical operations and instit
 import io
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+import pandas as pd
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -16,6 +17,41 @@ from lucainvestratto.models import BankAccount, Holding, Transaction
 from lucainvestratto.analytics.cashflow import calculate_cashflow_summary
 from lucainvestratto.analytics.assets import calculate_asset_summary
 from lucainvestratto.analytics.risk import calculate_risk_metrics
+
+# Module-level Typography & Colors
+FONT_TITLE = Font(name="Calibri", size=16, bold=True, color="0F172A")
+FONT_SUBTITLE = Font(name="Calibri", size=10, italic=True, color="64748B")
+FONT_HEADER = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+FONT_BOLD = Font(name="Calibri", size=11, bold=True, color="1E293B")
+FONT_NORMAL = Font(name="Calibri", size=10, color="1E293B")
+FONT_TOTAL = Font(name="Calibri", size=11, bold=True, color="0F172A")
+
+FILL_HEADER = PatternFill(start_color="0F172A", end_color="0F172A", fill_type="solid")
+FILL_ALT = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
+FILL_TOTAL = PatternFill(start_color="E2E8F0", end_color="E2E8F0", fill_type="solid")
+
+THIN_SIDE = Side(style='thin', color='CBD5E1')
+DOUBLE_BOTTOM_SIDE = Side(style='double', color='0F172A')
+THICK_TOP_SIDE = Side(style='medium', color='0F172A')
+
+THIN_BORDER = Border(left=THIN_SIDE, right=THIN_SIDE, top=THIN_SIDE, bottom=THIN_SIDE)
+TOTAL_BORDER = Border(left=THIN_SIDE, right=THIN_SIDE, top=THICK_TOP_SIDE, bottom=DOUBLE_BOTTOM_SIDE)
+
+# Standard Excel Number Formats
+FMT_CURRENCY = '#,##0.00 "€";[Red]-#,##0.00 "€";0.00 "€"'
+FMT_CURRENCY_PLAIN = '#,##0.00 "€"'
+FMT_PCT_SIGNED = '+0.00%;-0.00%;0.00%'
+FMT_PCT = '0.00%'
+FMT_QTY = '#,##0.0000'
+FMT_DECIMAL = '0.00'
+
+# Explicit Alignments: Numbers MUST always be right-aligned!
+ALIGN_LEFT = Alignment(horizontal="left", vertical="center")
+ALIGN_CENTER = Alignment(horizontal="center", vertical="center")
+ALIGN_RIGHT = Alignment(horizontal="right", vertical="center")
+ALIGN_HEADER_LEFT = Alignment(horizontal="left", vertical="center", wrap_text=True)
+ALIGN_HEADER_CENTER = Alignment(horizontal="center", vertical="center", wrap_text=True)
+ALIGN_HEADER_RIGHT = Alignment(horizontal="right", vertical="center", wrap_text=True)
 
 
 def _to_num(val: Any, default: float = 0.0) -> float:
@@ -41,40 +77,27 @@ def generate_excel_report(
 ) -> bytes:
     wb = openpyxl.Workbook()
 
-    # Typography & Colors
-    font_title = Font(name="Calibri", size=16, bold=True, color="0F172A")
-    font_subtitle = Font(name="Calibri", size=10, italic=True, color="64748B")
-    font_header = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
-    font_bold = Font(name="Calibri", size=11, bold=True, color="1E293B")
-    font_normal = Font(name="Calibri", size=10, color="1E293B")
-    font_total = Font(name="Calibri", size=11, bold=True, color="0F172A")
+    # Local aliases for shared constants
+    font_title = FONT_TITLE
+    font_subtitle = FONT_SUBTITLE
+    font_header = FONT_HEADER
+    font_bold = FONT_BOLD
+    font_normal = FONT_NORMAL
+    font_total = FONT_TOTAL
 
-    fill_header = PatternFill(start_color="0F172A", end_color="0F172A", fill_type="solid")
-    fill_alt = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
-    fill_total = PatternFill(start_color="E2E8F0", end_color="E2E8F0", fill_type="solid")
+    fill_header = FILL_HEADER
+    fill_alt = FILL_ALT
+    fill_total = FILL_TOTAL
 
-    thin_side = Side(style='thin', color='CBD5E1')
-    double_bottom_side = Side(style='double', color='0F172A')
-    thick_top_side = Side(style='medium', color='0F172A')
+    thin_border = THIN_BORDER
+    total_border = TOTAL_BORDER
 
-    thin_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
-    total_border = Border(left=thin_side, right=thin_side, top=thick_top_side, bottom=double_bottom_side)
-
-    # Standard Excel Number Formats
-    FMT_CURRENCY = '#,##0.00 "€";[Red]-#,##0.00 "€";0.00 "€"'
-    FMT_CURRENCY_PLAIN = '#,##0.00 "€"'
-    FMT_PCT_SIGNED = '+0.00%;-0.00%;0.00%'
-    FMT_PCT = '0.00%'
-    FMT_QTY = '#,##0.0000'
-    FMT_DECIMAL = '0.00'
-
-    # Explicit Alignments: Numbers MUST always be right-aligned!
-    align_left = Alignment(horizontal="left", vertical="center")
-    align_center = Alignment(horizontal="center", vertical="center")
-    align_right = Alignment(horizontal="right", vertical="center")
-    align_header_left = Alignment(horizontal="left", vertical="center", wrap_text=True)
-    align_header_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    align_header_right = Alignment(horizontal="right", vertical="center", wrap_text=True)
+    align_left = ALIGN_LEFT
+    align_center = ALIGN_CENTER
+    align_right = ALIGN_RIGHT
+    align_header_left = ALIGN_HEADER_LEFT
+    align_header_center = ALIGN_HEADER_CENTER
+    align_header_right = ALIGN_HEADER_RIGHT
 
     # Compute analytics
     cash_sum = calculate_cashflow_summary(transactions, accounts)
@@ -561,18 +584,160 @@ def generate_excel_report(
             ws4.cell(row=tot_tx_row, column=c).border = total_border
             ws4.cell(row=tot_tx_row, column=c).fill = fill_total
 
-    # Auto-fit columns across all sheets safely
+    # Auto-fit columns across all sheets safely (skipping titles in row 1 & 2)
     for ws in [ws1, ws2, ws3, ws4]:
         for col in ws.columns:
             max_len = 0
             for cell in col:
+                if cell.row in [1, 2]:
+                    continue
                 val = cell.value
                 if val is not None:
                     s = str(val)
                     if not s.startswith("="):
                         max_len = max(max_len, len(s))
             col_letter = get_column_letter(col[0].column)
-            ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+            ws.column_dimensions[col_letter].width = max(max_len + 4, 13)
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def generate_dataframe_excel(
+    df: pd.DataFrame,
+    title: str = "LUCAINVESTRATTO - Export Dati",
+    sheet_name: str = "Dati",
+    currency_cols: Optional[List[str]] = None,
+    pct_cols: Optional[List[str]] = None,
+    qty_cols: Optional[List[str]] = None,
+    center_cols: Optional[List[str]] = None,
+    sum_cols: Optional[List[str]] = None
+) -> bytes:
+    """
+    Generates a beautifully formatted single-sheet Excel workbook (.xlsx) from a Pandas DataFrame.
+    Guarantees:
+    - ALL numeric data is native float/int (never text strings).
+    - Explicit RIGHT ALIGNMENT on all numerical cells.
+    - Standard professional Excel number formats (Currency, Percent, Quantity).
+    - Institutional header, zebra stripes, and formula totals row.
+    """
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = sheet_name
+    ws.views.sheetView[0].showGridLines = True
+
+    # Title & Subtitle
+    ws["A1"] = title
+    ws["A1"].font = FONT_TITLE
+    ws["A2"] = f"Generato il: {datetime.now().strftime('%d/%m/%Y %H:%M')} | LUCAINVESTRATTO"
+    ws["A2"].font = FONT_SUBTITLE
+
+    c_cols = set(currency_cols or [])
+    p_cols = set(pct_cols or [])
+    q_cols = set(qty_cols or [])
+    ctr_cols = set(center_cols or [])
+    s_cols = set(sum_cols or [])
+
+    # Headers at row 4
+    for col_idx, col_name in enumerate(df.columns, 1):
+        cell = ws.cell(row=4, column=col_idx, value=col_name)
+        cell.font = FONT_HEADER
+        cell.fill = FILL_HEADER
+        cell.border = THIN_BORDER
+        if col_name in c_cols or col_name in p_cols or col_name in q_cols or pd.api.types.is_numeric_dtype(df[col_name]):
+            cell.alignment = ALIGN_HEADER_RIGHT
+        elif col_name in ctr_cols:
+            cell.alignment = ALIGN_HEADER_CENTER
+        else:
+            cell.alignment = ALIGN_HEADER_LEFT
+
+    # Data rows from row 5
+    for r_idx, row_data in enumerate(df.itertuples(index=False), 5):
+        is_even = (r_idx - 4) % 2 == 0
+        for c_idx, col_name in enumerate(df.columns, 1):
+            raw_val = getattr(row_data, row_data._fields[c_idx - 1])
+            cell = ws.cell(row=r_idx, column=c_idx)
+            cell.border = THIN_BORDER
+            if is_even:
+                cell.fill = FILL_ALT
+
+            if col_name in c_cols:
+                cell.value = _to_num(raw_val)
+                cell.number_format = FMT_CURRENCY
+                cell.alignment = ALIGN_RIGHT
+                cell.font = FONT_NORMAL
+            elif col_name in p_cols:
+                v = _to_num(raw_val)
+                # Convert 15.5 (%) to 0.155 for Excel percentage display
+                cell.value = v / 100.0 if abs(v) > 1.0 or v == 0.0 else v
+                cell.number_format = FMT_PCT_SIGNED if "P&L" in col_name else FMT_PCT
+                cell.alignment = ALIGN_RIGHT
+                cell.font = FONT_NORMAL
+            elif col_name in q_cols:
+                cell.value = _to_num(raw_val)
+                cell.number_format = FMT_QTY
+                cell.alignment = ALIGN_RIGHT
+                cell.font = FONT_NORMAL
+            elif pd.api.types.is_numeric_dtype(df[col_name]):
+                cell.value = _to_num(raw_val)
+                cell.number_format = FMT_DECIMAL
+                cell.alignment = ALIGN_RIGHT
+                cell.font = FONT_NORMAL
+            elif col_name in ctr_cols:
+                cell.value = str(raw_val) if raw_val is not None and not pd.isna(raw_val) else ""
+                cell.alignment = ALIGN_CENTER
+                cell.font = FONT_NORMAL
+            else:
+                cell.value = str(raw_val) if raw_val is not None and not pd.isna(raw_val) else ""
+                cell.alignment = ALIGN_LEFT
+                cell.font = FONT_NORMAL
+
+    # Total row
+    if not df.empty and s_cols:
+        start_row = 5
+        end_row = 4 + len(df)
+        tot_row = end_row + 1
+
+        lbl_cell = ws.cell(row=tot_row, column=1, value="TOTALE")
+        lbl_cell.font = FONT_TOTAL
+        lbl_cell.alignment = ALIGN_LEFT
+        lbl_cell.border = TOTAL_BORDER
+        lbl_cell.fill = FILL_TOTAL
+
+        for c_idx, col_name in enumerate(df.columns, 1):
+            cell = ws.cell(row=tot_row, column=c_idx)
+            cell.border = TOTAL_BORDER
+            cell.fill = FILL_TOTAL
+            col_letter = get_column_letter(c_idx)
+
+            if col_name in s_cols:
+                cell.value = f"=SUM({col_letter}{start_row}:{col_letter}{end_row})"
+                if col_name in c_cols:
+                    cell.number_format = FMT_CURRENCY
+                elif col_name in q_cols:
+                    cell.number_format = FMT_QTY
+                else:
+                    cell.number_format = FMT_DECIMAL
+                cell.alignment = ALIGN_RIGHT
+                cell.font = FONT_TOTAL
+            elif c_idx > 1:
+                if cell.value is None:
+                    cell.value = ""
+
+    # Auto-fit columns
+    for col in ws.columns:
+        max_len = 0
+        for cell in col:
+            if cell.row in [1, 2]:
+                continue
+            if cell.value is not None:
+                s = str(cell.value)
+                if not s.startswith("="):
+                    max_len = max(max_len, len(s))
+        col_letter = get_column_letter(col[0].column)
+        ws.column_dimensions[col_letter].width = max(max_len + 4, 13)
 
     buffer = io.BytesIO()
     wb.save(buffer)

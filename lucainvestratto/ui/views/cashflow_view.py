@@ -7,12 +7,13 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 
 from lucainvestratto.db import db
 from lucainvestratto.models import Transaction, BankAccount
 from lucainvestratto.analytics.cashflow import calculate_cashflow_summary
 from lucainvestratto.ui.theme import render_metric_card
+from lucainvestratto.export.excel_report import generate_dataframe_excel
 
 
 def render_cashflow_view(selected_account_id: str = "all"):
@@ -229,15 +230,37 @@ def render_cashflow_view(selected_account_id: str = "all"):
         # Ensure Importo is float
         df_display["Importo (€)"] = df_display["Importo (€)"].astype(float)
         
-        c_tbl, c_dl = st.columns([4, 1])
+        c_tbl, c_dl = st.columns([3, 1])
         with c_dl:
-            csv_data = df_display.to_csv(index=False).encode("utf-8-sig")
+            now_str = datetime.now().strftime('%Y%m%d_%H%M')
+            # 1. Excel (.xlsx) with strictly numeric floats, currency format, and right alignment
+            xlsx_data = generate_dataframe_excel(
+                df=df_display,
+                title="LUCAINVESTRATTO - Estratto Conto & Flussi di Cassa",
+                sheet_name="Movimenti",
+                currency_cols=["Importo (€)"],
+                center_cols=["Data", "Titolo"],
+                sum_cols=["Importo (€)"]
+            )
             st.download_button(
-                label="📥 Esporta CSV",
+                label="📥 Esporta Excel (.xlsx)",
+                data=xlsx_data,
+                file_name=f"LUCAINVESTRATTO_Movimenti_{now_str}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                type="primary",
+                use_container_width=True,
+                help="File Excel nativo con numeri formattati come Valuta (€) e allineati rigorosamente a DESTRA."
+            )
+
+            # 2. Italian Excel CSV (; separator, , decimal)
+            csv_data = df_display.to_csv(index=False, sep=";", decimal=",").encode("utf-8-sig")
+            st.download_button(
+                label="📥 Esporta CSV (Excel IT)",
                 data=csv_data,
-                file_name="LUCAINVESTRATTO_Movimenti.csv",
+                file_name=f"LUCAINVESTRATTO_Movimenti_{now_str}.csv",
                 mime="text/csv",
-                use_container_width=True
+                use_container_width=True,
+                help="Formato CSV con ';' e decimale virgola ',' per apertura diretta in Microsoft Excel con numeri riconosciuti e allineati a destra."
             )
 
         st.dataframe(

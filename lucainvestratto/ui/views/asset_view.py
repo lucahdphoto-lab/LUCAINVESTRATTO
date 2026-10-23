@@ -8,10 +8,13 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
+from datetime import datetime
+
 from lucainvestratto.db import db
 from lucainvestratto.models import Holding
 from lucainvestratto.analytics.assets import calculate_asset_summary
 from lucainvestratto.ui.theme import render_metric_card
+from lucainvestratto.export.excel_report import generate_dataframe_excel
 
 
 def render_asset_view(selected_account_id: str = "all"):
@@ -121,15 +124,39 @@ def render_asset_view(selected_account_id: str = "all"):
     for nc in numeric_cols:
         df_table[nc] = pd.to_numeric(df_table[nc], errors="coerce").fillna(0.0)
 
-    c_tbl, c_dl = st.columns([4, 1])
+    c_tbl, c_dl = st.columns([3, 1])
     with c_dl:
-        csv_data = df_table.to_csv(index=False).encode("utf-8-sig")
+        now_str = datetime.now().strftime('%Y%m%d_%H%M')
+        # 1. Excel (.xlsx) export with native numbers, right-aligned, and totals
+        xlsx_data = generate_dataframe_excel(
+            df=df_table,
+            title="LUCAINVESTRATTO - Portafoglio & Posizioni Dettagliate",
+            sheet_name="Posizioni",
+            currency_cols=["PMC (€)", "Prezzo Attuale (€)", "Costo Totale (€)", "Controvalore (€)", "P&L (€)"],
+            pct_cols=["P&L (%)", "Peso (%)", "Yield (%)"],
+            qty_cols=["Quantità"],
+            center_cols=["Simbolo"],
+            sum_cols=["Costo Totale (€)", "Controvalore (€)", "P&L (€)"]
+        )
         st.download_button(
-            label="📥 Esporta CSV",
+            label="📥 Esporta Excel (.xlsx)",
+            data=xlsx_data,
+            file_name=f"LUCAINVESTRATTO_Posizioni_{now_str}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            type="primary",
+            use_container_width=True,
+            help="File Excel nativo con numeri formattati come Valuta/Percentuale/Quantità e allineati rigorosamente a DESTRA."
+        )
+
+        # 2. Italian Excel CSV export (; separator, , decimal)
+        csv_data = df_table.to_csv(index=False, sep=";", decimal=",").encode("utf-8-sig")
+        st.download_button(
+            label="📥 Esporta CSV (Excel IT)",
             data=csv_data,
-            file_name="LUCAINVESTRATTO_Posizioni.csv",
+            file_name=f"LUCAINVESTRATTO_Posizioni_{now_str}.csv",
             mime="text/csv",
-            use_container_width=True
+            use_container_width=True,
+            help="Formato CSV con ';' e decimale virgola ',' per apertura diretta in Microsoft Excel con numeri riconosciuti e allineati a destra."
         )
 
     st.dataframe(
